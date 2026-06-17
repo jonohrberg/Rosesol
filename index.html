@@ -864,6 +864,7 @@ function renderPrak(){
   const klar=it=>{ const s=items[it.id]&&items[it.id].status; return s && s!=="Må trenes mer"; };
   const done=PRAKSIS.filter(klar).length;
   const allOk=PRAKSIS.every(klar);
+  const failCount=PRAKSIS.filter(it=>items[it.id]&&items[it.id].status==="Må trenes mer").length;
   let html=`<div class="card prog-wrap">
       <div class="lbl"><span>Klare øvelser (godkjent/anbefalt)</span><span>${done} / ${PRAKSIS.length}</span></div>
       <div class="progress"><i style="width:${done/PRAKSIS.length*100}%"></i></div>
@@ -887,6 +888,10 @@ function renderPrak(){
       <p style="margin:10px 0 0;font-size:.92rem">Assessor: <strong>${s.assessor}</strong> (sert. ${s.assessorCert}) · ${s.date}</p>
       <button class="btn sm noprint" style="width:100%;margin-top:10px" onclick="lastNedPraktiskPDF()">Last ned PDF (praktisk utsjekk)</button>
       <button class="btn sm ghost noprint" style="width:100%;margin-top:8px" onclick="angrePractical()">Angre signering</button></div>`;
+  } else if(failCount>=3){
+    html+=`<div class="card signoff locked"><span class="pill wait" style="font-size:.7rem">Ikke bestått</span>
+      <p style="margin:10px 0 0;font-size:.95rem"><strong>Ikke bestått.</strong> ${failCount} øvelser er satt til «Må trenes mer».</p>
+      <p style="margin:6px 0 0;font-size:.9rem;color:var(--muted)">Kontakt mannskapsavdelingen for å sette opp ny utsjekk.</p></div>`;
   } else if(!allOk){
     html+=`<div class="card signoff locked"><strong>Ikke klar for signering</strong>
       <p style="margin:6px 0 0;font-size:.9rem;color:var(--muted)">Alle øvelser må vurderes, og ingen kan stå på «Må trenes mer», før praktisk utsjekk kan signeres.</p></div>`;
