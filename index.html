@@ -153,7 +153,7 @@
         display:grid;place-items:center;cursor:pointer;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
   .hamb:hover{background:rgba(7,33,56,.78)}
   .admin-screen{position:fixed;inset:0;z-index:100;background:rgba(7,33,56,.6);display:grid;place-items:center;padding:18px}
-  .admin-box{background:#fff;border-radius:16px;box-shadow:0 18px 50px rgba(7,33,56,.45);width:100%;max-width:700px;
+  .admin-box{background:#fff;border-radius:16px;box-shadow:0 18px 50px rgba(7,33,56,.45);width:100%;max-width:960px;
         max-height:88vh;overflow:auto;padding:24px;position:relative}
   .admin-close{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:8px;border:1px solid var(--line);
         background:#eef2f7;color:var(--blue);font-size:15px;cursor:pointer}
@@ -161,6 +161,10 @@
   .adm-controls input,.adm-controls select{width:auto;flex:1;min-width:120px;padding:9px 10px;font-size:.9rem;margin:0}
   .btn-del{background:#fbecec;color:#c92e3b;border:1px solid #f0c9cd;border-radius:7px;padding:5px 10px;font-size:.78rem;cursor:pointer;white-space:nowrap}
   .btn-del:hover{background:#f6dcdf}
+  .adm-table{width:100%;border-collapse:collapse}
+  .adm-table th,.adm-table td{padding:9px 8px;font-size:.84rem;vertical-align:top;border-bottom:1px solid var(--line);text-align:left}
+  .adm-table th{font-size:.68rem;text-transform:uppercase;letter-spacing:.3px;color:var(--muted)}
+  .adm-table .sub2{font-size:.74rem;color:var(--muted)}
   .installbar{position:fixed;left:12px;right:12px;bottom:12px;z-index:60;display:flex;align-items:center;gap:12px;
         background:#fff;border-radius:14px;box-shadow:0 10px 30px rgba(7,33,56,.35);padding:12px 14px;max-width:560px;margin:0 auto}
   .installbar .ib-ico{font-size:24px;flex:none}
@@ -961,16 +965,21 @@ function applyAdminFilter(){
   let body="";
   rows.forEach((x,idx)=>{
     let prove='<span class="pill wait">Ikke tatt</span>';
-    if(x.quiz_total!=null){ prove=`${x.quiz_score}/${x.quiz_total} `+(x.quiz_passed?'<span class="pill ok">Bestått</span>':'<span class="pill wait">Ikke bestått</span>'); }
-    body+=`<tr><td><strong>${x.name||""}</strong>${x._src==="lokal"?' <span class="pill wait" style="font-size:.6rem">kun lokalt</span>':''}</td><td>${x.fodsel||""}</td><td>${x.vessel||""}</td><td>${x.role||""}</td>
-      <td>${x.training_done?'<span class="pill ok">Signert</span>':'—'}</td><td>${prove}</td>
-      <td>${x.diploma_signed?'<span class="pill ok">Signert</span>':'—'}</td><td>${admDate(x)}</td>
+    if(x.quiz_total!=null){ prove=`<strong>${x.quiz_score}/${x.quiz_total}</strong><br>`+(x.quiz_passed?'<span class="pill ok">Bestått</span>':'<span class="pill wait">Ikke bestått</span>'); }
+    const lokal = x._src==="lokal"?'<br><span class="pill wait" style="font-size:.6rem">kun lokalt</span>':'';
+    body+=`<tr>
+      <td><strong>${x.name||"–"}</strong><br><span class="sub2">${x.fodsel||""}</span>${lokal}</td>
+      <td>${x.vessel||""}<br><span class="sub2">${x.role||""}</span></td>
+      <td>${x.training_done?'<span class="pill ok">Signert</span>':'—'}</td>
+      <td>${prove}</td>
+      <td>${x.diploma_signed?'<span class="pill ok">Signert</span>':'—'}</td>
+      <td class="sub2">${admDate(x)}</td>
       <td><button class="btn-del" onclick="deleteByRow(${idx})">Slett</button></td></tr>`;
   });
   document.getElementById("admTableWrap").innerHTML=`
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 10px">${rows.length} vist · ${taken} har tatt prøven · ${passed} bestått</p>
-    ${rows.length?`<div style="overflow-x:auto"><table>
-      <thead><tr><th>Navn</th><th>Født</th><th>Fartøy</th><th>Rolle</th><th>Opplæring</th><th>Teoriprøve</th><th>Kursbevis</th><th>Dato</th><th></th></tr></thead>
+    ${rows.length?`<div style="overflow-x:auto"><table class="adm-table">
+      <thead><tr><th>Kandidat</th><th>Fartøy / rolle</th><th>Opplæring</th><th>Teoriprøve</th><th>Kursbevis</th><th>Dato</th><th></th></tr></thead>
       <tbody>${body}</tbody></table></div>`:'<div class="empty">Ingen treff.</div>'}`;
 }
 function adminExportCSV(){
