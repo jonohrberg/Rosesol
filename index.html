@@ -117,14 +117,19 @@
 <div id="login" class="login-screen">
   <div class="login-card">
     <div class="logo-big">🚢</div>
-    <h2>Ambulansebåten Rosesol</h2>
+    <h2>Hurtiggående fartøy</h2>
     <p class="lead">Opplæring og utsjekk katamaran-ambulansefartøy 32kn 131bt</p>
     <label for="navn">Navn</label>
     <input id="navn" type="text" placeholder="Ditt fulle navn" autocomplete="name" />
+    <label for="fartoy">Fartøy</label>
+    <select id="fartoy">
+      <option value="Rosesol">Ambulansefartøyet Rosesol</option>
+      <option value="Roseflora">Ambulansefartøyet Roseflora</option>
+    </select>
     <label for="rolle">Rolle</label>
     <select id="rolle">
-      <option value="Mannskap">Mannskap (under opplæring)</option>
-      <option value="Instruktør">Instruktør (kan godkjenne utsjekk)</option>
+      <option value="Skipsfører">Skipsfører</option>
+      <option value="Matros">Matros</option>
     </select>
     <button class="btn" onclick="login()">Logg inn</button>
     <p class="note">Ingen passord – du logger inn med navnet ditt. Data lagres lokalt på denne maskinen.</p>
@@ -137,7 +142,7 @@
     <div class="logo">🚢</div>
     <div>
       <h1>Rosesol – Opplæring og utsjekk</h1>
-      <div class="sub">Ambulansebåt</div>
+      <div class="sub">Hurtiggående ambulansefartøy</div>
     </div>
     <div class="who">
       <div id="whoName">—</div>
@@ -227,7 +232,7 @@ function db(){ try{ return JSON.parse(localStorage.getItem(STORE)) || {people:{}
 function saveDb(d){ localStorage.setItem(STORE, JSON.stringify(d)); }
 function person(name){
   const d = db();
-  if(!d.people[name]) d.people[name] = { role:"Mannskap", training:{}, checklist:{}, signedOff:null };
+  if(!d.people[name]) d.people[name] = { role:"Matros", vessel:"Rosesol", training:{}, checklist:{}, signedOff:null };
   return d;
 }
 
@@ -236,12 +241,14 @@ let current = null; // {name, role}
 /* ---------- Auth ---------- */
 function login(){
   const name = document.getElementById("navn").value.trim();
+  const vessel = document.getElementById("fartoy").value;
   const role = document.getElementById("rolle").value;
   if(!name){ alert("Skriv inn navnet ditt først."); return; }
   const d = person(name);
   d.people[name].role = role;
+  d.people[name].vessel = vessel;
   saveDb(d);
-  current = { name, role };
+  current = { name, vessel, role };
   localStorage.setItem("rosesol_current", JSON.stringify(current));
   enterApp();
 }
@@ -254,7 +261,7 @@ function logout(){
 function enterApp(){
   document.getElementById("login").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
-  document.getElementById("whoName").textContent = current.name + " · " + current.role;
+  document.getElementById("whoName").textContent = current.name + " · " + (current.vessel||"") + " · " + current.role;
   showTab("opp");
 }
 
@@ -347,18 +354,18 @@ function renderUts(){
       <p style="margin:6px 0 0;font-size:.9rem;color:var(--muted)">
         Alle punktene må være huket av før utsjekk kan godkjennes.</p>
     </div>`;
-  } else if(current.role==="Instruktør"){
+  } else if(current.role==="Skipsfører"){
     html += `<div class="card signoff">
       <strong>Alle punkter fullført ✓</strong>
       <p style="margin:6px 0 12px;font-size:.9rem;color:var(--muted)">
-        Som instruktør kan du godkjenne utsjekken nå.</p>
+        Som skipsfører kan du godkjenne utsjekken nå.</p>
       <button class="btn sm" style="width:100%" onclick="signOff()">Godkjenn utsjekk for ${current.name}</button>
     </div>`;
   } else {
     html += `<div class="card signoff">
       <strong>Klar for utsjekk ✓</strong>
       <p style="margin:6px 0 0;font-size:.9rem;color:var(--muted)">
-        Alle punkter er fullført. En instruktør må logge inn og godkjenne utsjekken din.</p>
+        Alle punkter er fullført. En skipsfører må logge inn og godkjenne utsjekken din.</p>
     </div>`;
   }
   document.getElementById("view-uts").innerHTML = html;
@@ -386,7 +393,7 @@ function renderOvr(){
     const utsOk = !!p.signedOff;
     rows += `
     <tr>
-      <td><strong>${n}</strong><br><span style="color:var(--muted);font-size:.8rem">${p.role}</span></td>
+      <td><strong>${n}</strong><br><span style="color:var(--muted);font-size:.8rem">${(p.vessel||"")} · ${p.role}</span></td>
       <td>${tDone}/${MODULER.length}</td>
       <td>${cDone}/${CHK_TOTAL}</td>
       <td>${utsOk
