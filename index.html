@@ -155,6 +155,8 @@
         max-height:88vh;overflow:auto;padding:24px;position:relative}
   .admin-close{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:8px;border:1px solid var(--line);
         background:#eef2f7;color:var(--blue);font-size:15px;cursor:pointer}
+  .adm-controls{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+  .adm-controls input,.adm-controls select{width:auto;flex:1;min-width:120px;padding:9px 10px;font-size:.9rem;margin:0}
   .installbar{position:fixed;left:12px;right:12px;bottom:12px;z-index:60;display:flex;align-items:center;gap:12px;
         background:#fff;border-radius:14px;box-shadow:0 10px 30px rgba(7,33,56,.35);padding:12px 14px;max-width:560px;margin:0 auto}
   .installbar .ib-ico{font-size:24px;flex:none}
@@ -225,6 +227,8 @@
     <p class="lead">Opplæring og utsjekk katamaran-ambulansefartøy 32kn 131bt</p>
     <label for="navn">Navn</label>
     <input id="navn" type="text" placeholder="Ditt fulle navn" autocomplete="name" />
+    <label for="fodsel">Fødselsdato</label>
+    <input id="fodsel" type="date" />
     <label for="fartoy">Fartøy</label>
     <select id="fartoy">
       <option value="Rosesol">Ambulansefartøyet Rosesol</option>
@@ -306,7 +310,7 @@ const POENG = [
  {t:"Vedlikehold av kompetanse (24–30 mnd)", x:"Innen 24 til 30 måneder etter utstedelse eller fornyelse skal innehaveren bestå godkjent oppdateringskurs, eller gjennomføre trening om bord under instruktør fra godkjent opplæringssted med vurdering av rederiets assessor."},
  {t:"Grunnleggende sikkerhetskurs (§9)", x:"På hurtiggående passasjerskip skal alle sjøfolk minst ha gjennomført og bestått grunnleggende sikkerhetskurs etter §9."},
  {t:"Overgangsregel – inntil 25 knop", x:"Dekksoffiserer som etter tidligere forskrift har fått sertifikat med adgang til å føre fartøy med hastighet opp til 25 knop, kan fortsatt føre slike fartøy."},
- {t:"Hva er et hurtiggående fartøy", x:"Et fartøy som oppnår høy hastighet (definert ved Froude-tall, jf. SOLAS kap. X). Lett konstruksjon og høy fart gir særskilte krav til drift og kompetanse."},
+ {t:"Hva er et hurtiggående fartøy (§2)", x:"Fartøy som definert i SOLAS kapittel X regel 1, uansett byggedato i utenriksfart. I innenriksfart regnes fartøy med bruttotonnasje 50 eller mer – eller som etter sertifikatet kan føre mer enn 12 passasjerer – som hurtiggående dersom det kan oppnå 20 knop eller mer."},
  {t:"Fartøysspesifikk kunnskap", x:"Kjenn det aktuelle fartøyets fremdrift (typisk vannjet), styre- og kontrollsystemer, motorovervåking og nødstopp – grunnlaget for den fartøysspesifikke utsjekken."},
  {t:"Manøvrering ved høy fart", x:"Hurtiggående fartøy manøvrerer annerledes enn deplasementsfartøy. Stoppdistanse, svingradius og effekten av vannjet må beherskes."},
  {t:"Farvannsspesifikk kunnskap", x:"__FARVANN__"},
@@ -376,9 +380,9 @@ function makeQuizData(){
 const STORE="rosesol_data_v2";
 function db(){ try{ return JSON.parse(localStorage.getItem(STORE)) || {people:{}}; }catch(e){ return {people:{}}; } }
 function saveDb(d){ localStorage.setItem(STORE, JSON.stringify(d)); }
-function person(name){
+function person(key){
   const d=db();
-  if(!d.people[name]) d.people[name]={ role:"Matros", vessel:"Rosesol", training:{}, quiz:null };
+  if(!d.people[key]) d.people[key]={ name:"", fodsel:"", role:"Matros", vessel:"Rosesol", training:{}, quiz:null, trainingDone:null, diplomaSign:null };
   return d;
 }
 let current=null;
@@ -387,14 +391,17 @@ let quizState={};
 /* ---------- Innlogging ---------- */
 function login(){
   const name=document.getElementById("navn").value.trim();
+  const fodsel=document.getElementById("fodsel").value;
   const vessel=document.getElementById("fartoy").value;
   const role=document.getElementById("rolle").value;
   if(!name){ alert("Skriv inn navnet ditt først."); return; }
-  const d=person(name);
-  d.people[name].role=role; d.people[name].vessel=vessel;
-  saveDb(d);
+  if(!fodsel){ alert("Velg fødselsdato – det skiller personer med likt navn."); return; }
   quizData=null;
-  current={ name, vessel, role };
+  current={ name, vessel, role, fodsel };
+  const key=curKey();
+  const d=person(key);
+  d.people[key].name=name; d.people[key].fodsel=fodsel; d.people[key].role=role; d.people[key].vessel=vessel;
+  saveDb(d);
   localStorage.setItem("rosesol_current", JSON.stringify(current));
   enterApp();
 }
@@ -444,6 +451,7 @@ function backToLogin(){
     document.getElementById("navn").value=current.name;
     document.getElementById("fartoy").value=current.vessel;
     document.getElementById("rolle").value=current.role;
+    document.getElementById("fodsel").value=current.fodsel||"";
   }
   document.getElementById("app").classList.add("hidden");
   document.getElementById("login").classList.remove("hidden");
@@ -480,7 +488,7 @@ function makePad(canvas){
 }
 
 function renderOpp(){
-  const d=db(); const p=d.people[current.name];
+  const d=db(); const p=d.people[curKey()];
   const done=POENG.filter((_,i)=>p.training[i]).length;
   const allDone=done===POENG.length;
   let html=`<div class="card prog-wrap">
@@ -529,7 +537,7 @@ function renderOpp(){
     padKand=makePad(document.getElementById("sigKand"));
   }
 }
-function markPoint(i){ const d=db(); const p=d.people[current.name]; p.training[i]=!p.training[i]; saveDb(d); renderOpp(); }
+function markPoint(i){ const d=db(); const p=d.people[curKey()]; p.training[i]=!p.training[i]; saveDb(d); renderOpp(); }
 
 function confirmTraining(){
   const instr=document.getElementById("instrName").value.trim();
@@ -538,66 +546,89 @@ function confirmTraining(){
   if(!cand){ alert("Skriv inn kandidatens navn."); return; }
   if(!padInstr || padInstr.isEmpty()){ alert("Opplæringsansvarlig må signere i feltet."); return; }
   if(!padKand || padKand.isEmpty()){ alert("Kandidaten må signere i feltet."); return; }
-  const d=db(); const p=d.people[current.name];
+  const d=db(); const p=d.people[curKey()];
   p.trainingDone={ confirmed:true,
     date:new Date().toLocaleDateString("no-NO",{day:"2-digit",month:"long",year:"numeric"}),
     instructor:instr, candidate:cand,
     instructorSig:padInstr.dataURL(), candidateSig:padKand.dataURL(),
     ref:(current.vessel.slice(0,3).toUpperCase()+"-OPP-"+Date.now().toString().slice(-6)) };
-  saveDb(d); renderOpp(); sbSync(current.name);
+  saveDb(d); renderOpp(); sbSync(curKey());
   alert("Opplæring bekreftet og signert. Teoriprøven er nå låst opp.");
 }
 function angreOpplaering(){
   if(!confirm("Angre signering av fullført opplæring? Teoriprøven låses igjen til ny signering.")) return;
-  const d=db(); const p=d.people[current.name]; p.trainingDone=null; saveDb(d); renderOpp();
+  const d=db(); const p=d.people[curKey()]; p.trainingDone=null; saveDb(d); renderOpp();
 }
 
 function lastNedOpplaeringPDF(){
-  const d=db(); const p=d.people[current.name]; const td=p.trainingDone;
+  const d=db(); const p=d.people[curKey()]; const td=p.trainingDone;
   if(!td){ alert("Fullfør og signer opplæringen først."); return; }
   if(!(window.jspdf && window.jspdf.jsPDF)){ alert("PDF-verktøyet er ikke ferdig lastet ennå. Prøv igjen om et par sekunder."); return; }
   const safe=s=>(""+s).replace(/[–—]/g,"-");
   const { jsPDF }=window.jspdf;
   const doc=new jsPDF({unit:"mm",format:"a4"});
-  const W=210, M=18;
-  doc.setFillColor(11,61,102); doc.rect(0,0,W,26,"F");
-  doc.setTextColor(255); doc.setFont("helvetica","bold"); doc.setFontSize(16);
-  doc.text("BEVIS FOR FULLFØRT OPPLÆRING", M, 13);
-  doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
-  doc.text(safe("Hurtiggående fartøy · forskrift 22.12.2011 nr. 1523 §65"), M, 19.5);
-  doc.setTextColor(30,40,55);
-  let y=38;
-  doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.text("Kandidat", M, y);
-  doc.setFont("helvetica","normal"); doc.text(safe(td.candidate), M+38, y); y+=7;
+  const W=210, M=16, BLUE=[11,61,102], BLUE2=[20,89,143], GREEN=[31,157,85], INK=[34,44,58], GREY=[120,132,148];
+  // Topp
+  doc.setFillColor(BLUE[0],BLUE[1],BLUE[2]); doc.rect(0,0,W,34,"F");
+  doc.setFillColor(GREEN[0],GREEN[1],GREEN[2]); doc.rect(0,34,W,2,"F");
+  doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.setFontSize(19);
+  doc.text("Bevis for fullført opplæring", M, 17);
+  doc.setFont("helvetica","normal"); doc.setFontSize(9.5); doc.setTextColor(200,216,232);
+  doc.text(safe("Hurtiggående fartøy · forskrift 2011-12-22-1523 §65"), M, 25);
+  doc.setFillColor(GREEN[0],GREEN[1],GREEN[2]); doc.roundedRect(W-M-40,9,40,11,5.5,5.5,"F");
+  doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.setFontSize(8.3);
+  doc.text("GJENNOMFØRT", W-M-20, 16, {align:"center"});
+  // Infokort
+  const cardY=44;
+  doc.setFillColor(244,247,250); doc.roundedRect(M,cardY,W-2*M,30,3,3,"F");
   const f=FARVANN[current.vessel]||"";
-  doc.setFont("helvetica","bold"); doc.text("Rolle / fartøy", M, y);
-  doc.setFont("helvetica","normal"); doc.text(safe(`${current.role} · ${current.vessel}${f?" ("+f+")":""}`), M+38, y); y+=7;
-  doc.setFont("helvetica","bold"); doc.text("Dato", M, y);
-  doc.setFont("helvetica","normal"); doc.text(safe(td.date), M+38, y); y+=11;
-  doc.setFontSize(10);
-  doc.text(safe("Kandidaten har gjennomgått og fullført følgende opplæringspunkter:"), M, y); y+=6;
-  doc.setFontSize(8.5);
-  const colX=[M,110]; const startY=y; const lineH=5.0;
+  function field(x,yy,label,val){
+    doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(BLUE2[0],BLUE2[1],BLUE2[2]);
+    doc.text(safe(label).toUpperCase(), x, yy);
+    doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor(INK[0],INK[1],INK[2]);
+    doc.text(safe(val||"-"), x, yy+6);
+  }
+  const colL=M+8, colR=W/2+2;
+  field(colL, cardY+9, "Kandidat", td.candidate);
+  field(colR, cardY+9, "Rolle / fartøy", current.role+" · "+current.vessel+(f?" ("+f+")":""));
+  field(colL, cardY+21, "Født", current.fodsel);
+  field(colR, cardY+21, "Fullført dato", td.date);
+  // Seksjon
+  let y=cardY+30+12;
+  doc.setFont("helvetica","bold"); doc.setFontSize(11.5); doc.setTextColor(BLUE[0],BLUE[1],BLUE[2]);
+  doc.text("Gjennomgåtte opplæringspunkter", M, y);
+  doc.setDrawColor(GREEN[0],GREEN[1],GREEN[2]); doc.setLineWidth(0.7); doc.line(M, y+2.5, M+60, y+2.5);
+  y+=9;
+  doc.setFontSize(8.6);
+  const colX=[M, W/2+2]; const lineH=5.4; const startY=y;
   POENG.forEach((pt,i)=>{
-    const col=i<10?0:1; const yy=startY+(i%10)*lineH;
-    doc.text(safe((i+1)+". "+pt.t), colX[col], yy);
+    const col=i<10?0:1; const yy=startY+(i%10)*lineH; const x=colX[col];
+    doc.setFillColor(GREEN[0],GREEN[1],GREEN[2]); doc.circle(x+1, yy-1.2, 1.1, "F");
+    doc.setTextColor(INK[0],INK[1],INK[2]); doc.setFont("helvetica","normal");
+    doc.text(safe((i+1)+". "+pt.t), x+5, yy, {maxWidth:82});
   });
-  const sigY=Math.max(startY+10*lineH+24, 236);
-  if(td.instructorSig) doc.addImage(td.instructorSig,"PNG", M, sigY-22, 80, 22);
-  if(td.candidateSig) doc.addImage(td.candidateSig,"PNG", 110, sigY-22, 80, 22);
-  doc.setDrawColor(150); doc.line(M,sigY,M+80,sigY); doc.line(110,sigY,190,sigY);
-  doc.setFontSize(8.5); doc.setTextColor(90);
-  doc.text(safe("Opplæringsansvarlig: "+td.instructor), M, sigY+5);
-  doc.text(safe("Kandidat: "+td.candidate), 110, sigY+5);
-  doc.setFontSize(7.5); doc.setTextColor(130);
-  doc.text(safe("Referanse: "+td.ref+"   ·   Generert "+new Date().toLocaleString("no-NO")), M, 290);
+  // Signaturer
+  const sigY=startY+10*lineH+30;
+  if(td.instructorSig) doc.addImage(td.instructorSig,"PNG",M,sigY-24,78,22);
+  if(td.candidateSig) doc.addImage(td.candidateSig,"PNG",W-M-78,sigY-24,78,22);
+  doc.setDrawColor(180,190,200); doc.setLineWidth(0.4);
+  doc.line(M,sigY,M+78,sigY); doc.line(W-M-78,sigY,W-M,sigY);
+  doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.setTextColor(INK[0],INK[1],INK[2]);
+  doc.text("Opplæringsansvarlig", M, sigY+5); doc.text("Kandidat", W-M-78, sigY+5);
+  doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(GREY[0],GREY[1],GREY[2]);
+  doc.text(safe(td.instructor), M, sigY+10); doc.text(safe(td.candidate), W-M-78, sigY+10);
+  // Bunntekst
+  doc.setDrawColor(225,230,236); doc.setLineWidth(0.4); doc.line(M,285,W-M,285);
+  doc.setFontSize(7.5); doc.setTextColor(GREY[0],GREY[1],GREY[2]);
+  doc.text(safe("Referanse: "+td.ref), M, 290);
+  doc.text(safe("Generert "+new Date().toLocaleString("no-NO")), W-M, 290, {align:"right"});
   doc.save("Fullfort-opplaering-"+(""+current.name).replace(/\s+/g,"-")+".pdf");
 }
 
 
 /* ---------- Teoriprøve (15 spørsmål) ---------- */
 function renderQuiz(){
-  const d=db(); const p=d.people[current.name];
+  const d=db(); const p=d.people[curKey()];
   const examUnlocked = p.trainingDone && p.trainingDone.confirmed;
   const view=document.getElementById("view-quiz");
   if(!examUnlocked){
@@ -638,10 +669,10 @@ function submitQuiz(){
     else { if(optEl) optEl.classList.add("wrong"); const ce=document.getElementById(`opt-${qi}-${it.a}`); if(ce) ce.classList.add("correct"); }
   });
   const passed=score>=PASS;
-  const d=db(); const p=d.people[current.name];
+  const d=db(); const p=d.people[curKey()];
   const date=new Date().toLocaleDateString("no-NO",{day:"2-digit",month:"long",year:"numeric"});
   p.quiz={ passed, score, total:Q.length, date, ref:(current.vessel.slice(0,3).toUpperCase()+"-"+Date.now().toString().slice(-6)) };
-  saveDb(d); sbSync(current.name);
+  saveDb(d); sbSync(curKey());
   const res=document.getElementById("quizResult");
   if(passed){
     res.innerHTML=`<div class="card signoff"><strong>Bestått! 🎉 ${score}/${Q.length}</strong>
@@ -658,7 +689,7 @@ function submitQuiz(){
 /* ---------- Kursbevis ---------- */
 let padAss=null, padKan2=null;
 function renderDipl(){
-  const d=db(); const p=d.people[current.name];
+  const d=db(); const p=d.people[curKey()];
   const view=document.getElementById("view-dipl");
   if(!(p.quiz && p.quiz.passed)){
     view.innerHTML=`<div class="card"><div class="locktab"><div class="big">🔒</div>
@@ -681,6 +712,7 @@ function renderDipl(){
       <div style="font-size:.85rem;color:var(--muted)">Dette bekrefter at</div>
       <div class="name">${current.name}</div>
       <div class="meta">${current.role} · ${current.vessel}${f?" ("+f+")":""}</div>
+      <div class="meta" style="font-size:.82rem;margin-top:2px">Født: ${current.fodsel||"–"}</div>
       <div class="stamp"><div><div class="chk">✓</div><div class="txt">BESTÅTT</div></div></div>
       <div class="meta">Resultat: <strong>${p.quiz.score}/${p.quiz.total}</strong> · ${p.quiz.date}</div>
       ${sigHtml}
@@ -725,19 +757,19 @@ function signDiploma(){
   if(!kan){ alert("Skriv inn kandidatens navn."); return; }
   if(!padAss || padAss.isEmpty()){ alert("Assessor må signere i feltet."); return; }
   if(!padKan2 || padKan2.isEmpty()){ alert("Kandidaten må signere i feltet."); return; }
-  const d=db(); const p=d.people[current.name];
+  const d=db(); const p=d.people[curKey()];
   p.diplomaSign={ assessor:ass, assessorCert:cert, candidate:kan,
     assessorSig:padAss.dataURL(), candidateSig:padKan2.dataURL(),
     date:new Date().toLocaleDateString("no-NO",{day:"2-digit",month:"long",year:"numeric"}) };
-  saveDb(d); renderDipl(); sbSync(current.name);
+  saveDb(d); renderDipl(); sbSync(curKey());
   alert("Kursbeviset er signert.");
 }
 function angreDiplomaSign(){
   if(!confirm("Angre signering av kursbeviset?")) return;
-  const d=db(); const p=d.people[current.name]; p.diplomaSign=null; saveDb(d); renderDipl();
+  const d=db(); const p=d.people[curKey()]; p.diplomaSign=null; saveDb(d); renderDipl();
 }
 function lastNedKursbevisPDF(){
-  const d=db(); const p=d.people[current.name]; const ds=p.diplomaSign;
+  const d=db(); const p=d.people[curKey()]; const ds=p.diplomaSign;
   if(!(p.quiz && p.quiz.passed)){ alert("Bestå teoriprøven først."); return; }
   if(!ds){ alert("Signér kursbeviset først."); return; }
   if(!(window.jspdf && window.jspdf.jsPDF)){ alert("PDF-verktøyet er ikke ferdig lastet ennå. Prøv igjen om et par sekunder."); return; }
@@ -759,7 +791,7 @@ function lastNedKursbevisPDF(){
   doc.text(safe(current.name), W/2, 90, {align:"center"});
   const f=FARVANN[current.vessel]||"";
   doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor(40,50,65);
-  doc.text(safe(`${current.role} · ${current.vessel}${f?" ("+f+")":""}`), W/2, 99, {align:"center"});
+  doc.text(safe(`${current.role} · ${current.vessel}${f?" ("+f+")":""} · f. ${current.fodsel||"-"}`), W/2, 99, {align:"center"});
   doc.text(safe(`har bestått teoriprøven med resultat ${p.quiz.score}/${p.quiz.total}.`), W/2, 108, {align:"center"});
   doc.setDrawColor(31,157,85); doc.setLineWidth(1.6); doc.circle(W/2,128,15);
   doc.setTextColor(31,157,85); doc.setFont("helvetica","bold"); doc.setFontSize(18);
@@ -809,10 +841,11 @@ function renderOvr(){
 const SB_URL="https://qazvbvcjjfyihpnydmsf.supabase.co";
 const SB_KEY="sb_publishable_1-Fj9IZiKXrWHGqjxaT_Dg_FV1DifAA";
 let adminCodeCur="";
-function sbRow(name,p){
+function curKey(){ return ((current&&current.name)||"")+"|"+((current&&current.fodsel)||""); }
+function sbRow(p){
   return {
-    cid:name+"|"+(p.vessel||""),
-    name:name, vessel:p.vessel||null, role:p.role||null,
+    cid:(p.name||"")+"|"+(p.fodsel||"")+"|"+(p.vessel||""),
+    name:p.name||null, fodsel:p.fodsel||null, vessel:p.vessel||null, role:p.role||null,
     training_done:!!(p.trainingDone&&p.trainingDone.confirmed),
     training_date:(p.trainingDone&&p.trainingDone.date)||null,
     instructor:(p.trainingDone&&p.trainingDone.instructor)||null,
@@ -827,14 +860,14 @@ function sbRow(name,p){
     updated_at:new Date().toISOString()
   };
 }
-function sbSync(name){
+function sbSync(key){
   if(!SB_URL||!SB_KEY) return;
   try{
-    const d=db(); const p=d.people[name]; if(!p) return;
+    const d=db(); const p=d.people[key]; if(!p) return;
     fetch(SB_URL+"/rest/v1/results",{
       method:"POST",
       headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=minimal"},
-      body:JSON.stringify(sbRow(name,p))
+      body:JSON.stringify(sbRow(p))
     }).catch(()=>{});
   }catch(e){}
 }
@@ -854,51 +887,77 @@ function adminAuth(){
   document.getElementById("adminPanel").classList.remove("hidden");
   adminCodeCur=code; renderAdmin(code);
 }
+let adminRows=[]; let adminOnline=false;
 async function renderAdmin(code){
   const panel=document.getElementById("adminPanel");
   panel.innerHTML='<h2 style="margin:0 0 10px">Kandidatoversikt</h2><p style="color:var(--muted)">Henter kandidater &hellip;</p>';
-  let rows=null, online=false;
+  let rows=null; adminOnline=false;
   if(SB_URL&&SB_KEY){
     try{
-      const r=await fetch(SB_URL+"/rest/v1/rpc/admin_results",{
-        method:"POST",
+      const r=await fetch(SB_URL+"/rest/v1/rpc/admin_results",{method:"POST",
         headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"},
-        body:JSON.stringify({p_code:code||""})
-      });
-      if(r.ok){ rows=await r.json(); online=true; }
+        body:JSON.stringify({p_code:code||""})});
+      if(r.ok){ rows=await r.json(); adminOnline=true; }
     }catch(e){}
   }
-  if(rows===null){
-    const d=db(); rows=Object.keys(d.people).map(n=>sbRow(n,d.people[n]));
-  }
-  rows=(rows||[]).filter(x=>x && x.cid && !x.cid.startsWith("_"));
+  if(rows===null){ const d=db(); rows=Object.keys(d.people).map(n=>sbRow(d.people[n])); }
+  adminRows=(rows||[]).filter(x=>x && x.cid && !String(x.cid).startsWith("_"));
+  panel.innerHTML=`<h2 style="margin:0 0 2px">Kandidatoversikt</h2>
+    <p style="margin:0 0 12px"><span class="pill ${adminOnline?'ok':'wait'}">${adminOnline?'✓ Tilkoblet skydatabasen':'⚠ Ingen kontakt – viser lokale data'}</span></p>
+    <div class="adm-controls">
+      <input id="admSearch" type="text" placeholder="Søk navn / assessor" oninput="applyAdminFilter()"/>
+      <select id="admVessel" onchange="applyAdminFilter()"><option value="all">Alle fartøy</option><option value="Rosesol">Rosesol</option><option value="Roseflora">Roseflora</option></select>
+      <select id="admStatus" onchange="applyAdminFilter()"><option value="all">Alle</option><option value="passed">Bestått</option><option value="failed">Ikke bestått</option><option value="none">Ikke tatt</option></select>
+    </div>
+    <div id="admTableWrap"></div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn ghost sm" onclick="renderAdmin(adminCodeCur)">Oppdater</button>
+      <button class="btn ghost sm" onclick="adminExportCSV()">Last ned CSV</button>
+      <button class="btn sm" onclick="closeAdmin()">Lukk</button>
+    </div>`;
+  applyAdminFilter();
+}
+function adminFiltered(){
+  const q=(document.getElementById("admSearch").value||"").toLowerCase();
+  const ves=document.getElementById("admVessel").value;
+  const st=document.getElementById("admStatus").value;
+  return adminRows.filter(x=>{
+    if(ves!=="all" && (x.vessel||"")!==ves) return false;
+    if(st==="passed" && !x.quiz_passed) return false;
+    if(st==="failed" && !(x.quiz_total!=null && !x.quiz_passed)) return false;
+    if(st==="none" && x.quiz_total!=null) return false;
+    if(q){ const hay=((x.name||"")+" "+(x.assessor||"")).toLowerCase(); if(!hay.includes(q)) return false; }
+    return true;
+  });
+}
+function admDate(x){ return x.quiz_date || x.training_date || (x.updated_at?String(x.updated_at).slice(0,10):"") || "—"; }
+function applyAdminFilter(){
+  const rows=adminFiltered();
   const taken=rows.filter(x=>x.quiz_total!=null).length;
   const passed=rows.filter(x=>x.quiz_passed).length;
   let body="";
   rows.forEach(x=>{
     let prove='<span class="pill wait">Ikke tatt</span>';
-    if(x.quiz_total!=null){
-      prove=`${x.quiz_score}/${x.quiz_total} `+(x.quiz_passed?'<span class="pill ok">Bestått</span>':'<span class="pill wait">Ikke bestått</span>');
-    }
-    body+=`<tr>
-      <td><strong>${x.name||""}</strong></td>
-      <td>${x.vessel||""}</td>
-      <td>${x.role||""}</td>
-      <td>${x.training_done?'<span class="pill ok">Signert</span>':'—'}</td>
-      <td>${prove}</td>
-      <td>${x.diploma_signed?'<span class="pill ok">Signert</span>':'—'}</td></tr>`;
+    if(x.quiz_total!=null){ prove=`${x.quiz_score}/${x.quiz_total} `+(x.quiz_passed?'<span class="pill ok">Bestått</span>':'<span class="pill wait">Ikke bestått</span>'); }
+    body+=`<tr><td><strong>${x.name||""}</strong></td><td>${x.fodsel||""}</td><td>${x.vessel||""}</td><td>${x.role||""}</td>
+      <td>${x.training_done?'<span class="pill ok">Signert</span>':'—'}</td><td>${prove}</td>
+      <td>${x.diploma_signed?'<span class="pill ok">Signert</span>':'—'}</td><td>${admDate(x)}</td></tr>`;
   });
-  panel.innerHTML=`<h2 style="margin:0 0 4px">Kandidatoversikt</h2>
-    <p style="color:var(--muted);font-size:.88rem;margin:0 0 14px">${rows.length} kandidater · ${taken} har tatt prøven · ${passed} bestått</p>
+  document.getElementById("admTableWrap").innerHTML=`
+    <p style="color:var(--muted);font-size:.85rem;margin:0 0 10px">${rows.length} vist · ${taken} har tatt prøven · ${passed} bestått</p>
     ${rows.length?`<div style="overflow-x:auto"><table>
-      <thead><tr><th>Navn</th><th>Fartøy</th><th>Rolle</th><th>Opplæring</th><th>Teoriprøve</th><th>Kursbevis</th></tr></thead>
-      <tbody>${body}</tbody></table></div>`
-      :'<div class="empty">Ingen kandidater registrert ennå.</div>'}
-    <p class="note" style="text-align:left">${online?'Henter fra delt skydatabase – viser alle enheter.':'Viser kun lokale data (fikk ikke kontakt med skydatabasen).'}</p>
-    <div style="display:flex;gap:8px;margin-top:6px">
-      <button class="btn ghost" style="margin-top:0" onclick="renderAdmin(adminCodeCur)">Oppdater</button>
-      <button class="btn ghost" style="margin-top:0" onclick="closeAdmin()">Lukk</button>
-    </div>`;
+      <thead><tr><th>Navn</th><th>Født</th><th>Fartøy</th><th>Rolle</th><th>Opplæring</th><th>Teoriprøve</th><th>Kursbevis</th><th>Dato</th></tr></thead>
+      <tbody>${body}</tbody></table></div>`:'<div class="empty">Ingen treff.</div>'}`;
+}
+function adminExportCSV(){
+  const rows=adminFiltered();
+  const cols=["name","fodsel","vessel","role","training_done","training_date","instructor","quiz_score","quiz_total","quiz_passed","quiz_date","diploma_signed","assessor","assessor_cert","ref"];
+  const head=["Navn","Født","Fartøy","Rolle","Opplæring fullført","Opplæring dato","Opplæringsansvarlig","Score","Maks","Bestått","Prøvedato","Kursbevis signert","Assessor","Assessor sertifikatnr","Referanse"];
+  const esc=v=>{ v=(v==null?"":String(v)); return '"'+v.replace(/"/g,'""')+'"'; };
+  let csv=head.map(esc).join(";")+"\n";
+  rows.forEach(x=>{ csv+=cols.map(c=>esc(x[c])).join(";")+"\n"; });
+  const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="kandidater-utsjekk.csv"; document.body.appendChild(a); a.click(); a.remove();
 }
 
 /* ---------- PWA: service worker + installering ---------- */
