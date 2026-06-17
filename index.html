@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Rosesol – Opplæring og utsjekk</title>
+<style>
+  :root{
+    --blue:#0b3d66; --blue-2:#14598f; --accent:#e63946;
+    --bg:#f4f7fa; --card:#ffffff; --line:#e2e8f0;
+    --text:#1c2733; --muted:#647082; --ok:#1f9d55; --okbg:#e7f6ec;
+    --shadow:0 2px 10px rgba(11,61,102,.08);
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       background:var(--bg);color:var(--text);line-height:1.5}
+  button{font-family:inherit;cursor:pointer}
+  .hidden{display:none !important}
+
+  /* Header */
+  header{background:linear-gradient(135deg,var(--blue),var(--blue-2));color:#fff;padding:18px 20px;
+         display:flex;align-items:center;gap:14px;box-shadow:var(--shadow)}
+  .logo{width:42px;height:42px;border-radius:10px;background:#fff;display:grid;place-items:center;
+        font-size:24px;flex:none}
+  header h1{font-size:1.15rem;margin:0;font-weight:700;letter-spacing:.2px}
+  header .sub{font-size:.8rem;opacity:.85;margin-top:2px}
+  header .who{margin-left:auto;text-align:right;font-size:.85rem}
+  header .who button{margin-top:4px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);
+        color:#fff;border-radius:8px;padding:4px 10px;font-size:.78rem}
+
+  .wrap{max-width:760px;margin:0 auto;padding:20px}
+
+  /* Login */
+  .login-card{max-width:420px;margin:8vh auto;background:var(--card);border-radius:var(--radius);
+        box-shadow:var(--shadow);padding:30px}
+  .login-card .logo-big{width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,var(--blue),var(--blue-2));
+        display:grid;place-items:center;font-size:34px;margin:0 auto 14px}
+  .login-card h2{text-align:center;margin:0 0 4px}
+  .login-card p.lead{text-align:center;color:var(--muted);margin:0 0 22px;font-size:.9rem}
+  label{display:block;font-size:.82rem;font-weight:600;color:var(--muted);margin:14px 0 6px}
+  input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:1rem;
+        background:#fff;color:var(--text)}
+  input:focus,select:focus{outline:none;border-color:var(--blue-2);box-shadow:0 0 0 3px rgba(20,89,143,.12)}
+  .btn{display:inline-block;width:100%;background:var(--blue);color:#fff;border:none;border-radius:10px;
+        padding:13px;font-size:1rem;font-weight:600;margin-top:20px;transition:background .15s}
+  .btn:hover{background:var(--blue-2)}
+  .btn.accent{background:var(--accent)}
+  .btn.accent:hover{background:#c92e3b}
+  .btn.ghost{background:#eef2f7;color:var(--blue)}
+  .btn.ghost:hover{background:#e3e9f1}
+  .btn.sm{width:auto;padding:8px 14px;font-size:.85rem;margin-top:0}
+
+  /* Tabs */
+  nav.tabs{display:flex;gap:6px;background:var(--card);border-radius:12px;padding:6px;box-shadow:var(--shadow);
+        margin-bottom:18px}
+  nav.tabs button{flex:1;border:none;background:transparent;padding:10px;border-radius:8px;font-weight:600;
+        font-size:.9rem;color:var(--muted)}
+  nav.tabs button.active{background:var(--blue);color:#fff}
+
+  /* Cards */
+  .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:14px;overflow:hidden}
+  .module-head{display:flex;align-items:center;gap:12px;padding:16px 18px;cursor:pointer}
+  .module-head .ico{width:36px;height:36px;border-radius:9px;background:#eaf1f8;display:grid;place-items:center;
+        font-size:19px;flex:none}
+  .module-head .t{flex:1}
+  .module-head .t strong{display:block;font-size:.98rem}
+  .module-head .t span{font-size:.8rem;color:var(--muted)}
+  .check-dot{width:24px;height:24px;border-radius:50%;border:2px solid var(--line);flex:none;display:grid;
+        place-items:center;color:#fff;font-size:14px}
+  .check-dot.done{background:var(--ok);border-color:var(--ok)}
+  .module-body{padding:0 18px 18px;border-top:1px solid var(--line);font-size:.92rem;color:#2a3744}
+  .module-body ul{margin:12px 0;padding-left:20px}
+  .module-body li{margin:5px 0}
+
+  /* Checklist */
+  .chk-item{display:flex;align-items:flex-start;gap:12px;padding:13px 18px;border-bottom:1px solid var(--line)}
+  .chk-item:last-child{border-bottom:none}
+  .chk-item input[type=checkbox]{width:22px;height:22px;flex:none;margin-top:1px;accent-color:var(--ok)}
+  .chk-item label{margin:0;color:var(--text);font-weight:500;font-size:.94rem;flex:1}
+  .chk-item .hint{display:block;font-weight:400;color:var(--muted);font-size:.82rem;margin-top:2px}
+  .group-title{padding:14px 18px 6px;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+        color:var(--blue-2)}
+
+  /* Progress */
+  .progress{height:9px;background:#e7edf3;border-radius:99px;overflow:hidden;margin:6px 0 0}
+  .progress > i{display:block;height:100%;background:var(--ok);width:0;transition:width .3s}
+  .prog-wrap{padding:16px 18px}
+  .prog-wrap .lbl{display:flex;justify-content:space-between;font-size:.85rem;color:var(--muted)}
+
+  .signoff{padding:18px;background:var(--okbg);border-top:1px solid #cde9d6}
+  .signoff.locked{background:#fbf3f3;border-top-color:#f3d6d9}
+  .badge{display:inline-flex;align-items:center;gap:6px;background:var(--okbg);color:var(--ok);
+        padding:4px 10px;border-radius:99px;font-size:.8rem;font-weight:600}
+
+  /* Oversikt */
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);font-size:.9rem}
+  th{font-size:.74rem;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+  .pill{font-size:.75rem;padding:3px 9px;border-radius:99px;font-weight:600}
+  .pill.ok{background:var(--okbg);color:var(--ok)}
+  .pill.wait{background:#fff4e0;color:#b9770a}
+  .empty{text-align:center;color:var(--muted);padding:30px;font-size:.9rem}
+  .note{font-size:.82rem;color:var(--muted);text-align:center;margin:18px 0}
+  h2.section{font-size:1.05rem;margin:4px 0 14px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login" class="login-card">
+  <div class="logo-big">🚑</div>
+  <h2>Ambulansebåten Rosesol</h2>
+  <p class="lead">Opplæring og utsjekk for mannskap</p>
+  <label for="navn">Navn</label>
+  <input id="navn" type="text" placeholder="Ditt fulle navn" autocomplete="name" />
+  <label for="rolle">Rolle</label>
+  <select id="rolle">
+    <option value="Mannskap">Mannskap (under opplæring)</option>
+    <option value="Instruktør">Instruktør (kan godkjenne utsjekk)</option>
+  </select>
+  <button class="btn" onclick="login()">Logg inn</button>
+  <p class="note">Ingen passord – du logger inn med navnet ditt. Data lagres lokalt på denne maskinen.</p>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <header>
+    <div class="logo">🚑</div>
+    <div>
+      <h1>Rosesol – Opplæring og utsjekk</h1>
+      <div class="sub">Ambulansebåt</div>
+    </div>
+    <div class="who">
+      <div id="whoName">—</div>
+      <button onclick="logout()">Logg ut</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <nav class="tabs">
+      <button id="tab-opp" class="active" onclick="showTab('opp')">Opplæring</button>
+      <button id="tab-uts" onclick="showTab('uts')">Utsjekk</button>
+      <button id="tab-ovr" onclick="showTab('ovr')">Oversikt</button>
+    </nav>
+
+    <section id="view-opp"></section>
+    <section id="view-uts" class="hidden"></section>
+    <section id="view-ovr" class="hidden"></section>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   INNHOLD  –  endre fritt her. Dette er eksempeltekst for Rosesol.
+   ========================================================================= */
+const MODULER = [
+  { id:"m1", ikon:"🦺", tittel:"Sikkerhet om bord",
+    punkter:[
+      "Plassering og bruk av redningsvester og overlevingsdrakter",
+      "Mann-over-bord (MOB): varsling, snuteknikk og opphenting",
+      "Brannslukker, nødstopp og lensepumpe – hvor og hvordan",
+      "Nødkommunikasjon og varsling av AMK / 113"
+    ]},
+  { id:"m2", ikon:"⚙️", tittel:"Båten Rosesol",
+    punkter:[
+      "Motor: oppstart, kontroll av kjølevann og varsellamper",
+      "Drivstoffnivå, tanker og påfylling",
+      "Instrumentpanel: turtall, batteri, navigasjonslys",
+      "Daglig sjekk før avgang"
+    ]},
+  { id:"m3", ikon:"🧭", tittel:"Navigasjon og kommunikasjon",
+    punkter:[
+      "VHF: kanaler, anrop og nødprosedyre (Mayday)",
+      "Kartplotter og GPS – posisjon og rute",
+      "Lokalkunnskap: grunner, leder og fortøyningssteder",
+      "Seilas i mørke og dårlig sikt"
+    ]},
+  { id:"m4", ikon:"🩺", tittel:"Pasienthåndtering",
+    punkter:[
+      "Henting og ombordtaking av båre",
+      "Sikring av pasient og utstyr under seilas",
+      "Samhandling med ambulansepersonell og AMK",
+      "Hygiene og rengjøring etter oppdrag"
+    ]},
+  { id:"m5", ikon:"⚓", tittel:"Fortøyning og manøvrering",
+    punkter:[
+      "Manøvrering i havn og ved kai",
+      "Fortøyning og bruk av fendere",
+      "Ankring ved behov",
+      "Avgang og ankomst i ulike værforhold"
+    ]}
+];
+
+const SJEKKLISTE = [
+  { gruppe:"Før avgang", items:[
+    { id:"c1", tekst:"Sikkerhetsutstyr kontrollert", hint:"Vester, MOB-utstyr, brannslukker, lensepumpe" },
+    { id:"c2", tekst:"Daglig motorsjekk utført", hint:"Olje, kjølevann, drivstoff, varsellamper" },
+    { id:"c3", tekst:"Kommunikasjon testet", hint:"VHF og mobil, dekning og kanaler" }
+  ]},
+  { gruppe:"Praktisk seilas", items:[
+    { id:"c4", tekst:"Oppstart og frakobling fra kai", hint:"Selvstendig og kontrollert" },
+    { id:"c5", tekst:"Manøvrering i havn", hint:"Vending, sakte fart, posisjonering" },
+    { id:"c6", tekst:"Fortøyning ved kai", hint:"Korrekt og sikkert, med fendere" },
+    { id:"c7", tekst:"Navigasjon med kartplotter", hint:"Følge rute og posisjon" }
+  ]},
+  { gruppe:"Beredskap", items:[
+    { id:"c8", tekst:"MOB-øvelse gjennomført", hint:"Varsling, snuing og opphenting" },
+    { id:"c9", tekst:"Pasient/båre ombord og sikret", hint:"Trygg plassering under seilas" },
+    { id:"c10", tekst:"Nødprosedyre VHF demonstrert", hint:"Mayday / anrop til AMK" }
+  ]}
+];
+/* ========================================================================= */
+
+const CHK_TOTAL = SJEKKLISTE.reduce((n,g)=>n+g.items.length,0);
+const STORE = "rosesol_data_v1";
+
+function db(){ try{ return JSON.parse(localStorage.getItem(STORE)) || {people:{}}; }catch(e){ return {people:{}}; } }
+function saveDb(d){ localStorage.setItem(STORE, JSON.stringify(d)); }
+function person(name){
+  const d = db();
+  if(!d.people[name]) d.people[name] = { role:"Mannskap", training:{}, checklist:{}, signedOff:null };
+  return d;
+}
+
+let current = null; // {name, role}
+
+/* ---------- Auth ---------- */
+function login(){
+  const name = document.getElementById("navn").value.trim();
+  const role = document.getElementById("rolle").value;
+  if(!name){ alert("Skriv inn navnet ditt først."); return; }
+  const d = person(name);
+  d.people[name].role = role;
+  saveDb(d);
+  current = { name, role };
+  localStorage.setItem("rosesol_current", JSON.stringify(current));
+  enterApp();
+}
+function logout(){
+  localStorage.removeItem("rosesol_current");
+  current = null;
+  document.getElementById("app").classList.add("hidden");
+  document.getElementById("login").classList.remove("hidden");
+}
+function enterApp(){
+  document.getElementById("login").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+  document.getElementById("whoName").textContent = current.name + " · " + current.role;
+  showTab("opp");
+}
+
+/* ---------- Tabs ---------- */
+function showTab(t){
+  ["opp","uts","ovr"].forEach(x=>{
+    document.getElementById("view-"+x).classList.toggle("hidden", x!==t);
+    document.getElementById("tab-"+x).classList.toggle("active", x===t);
+  });
+  if(t==="opp") renderOpp();
+  if(t==="uts") renderUts();
+  if(t==="ovr") renderOvr();
+}
+
+/* ---------- Opplæring ---------- */
+function renderOpp(){
+  const d = db(); const p = d.people[current.name];
+  const done = MODULER.filter(m=>p.training[m.id]).length;
+  let html = `
+    <div class="card prog-wrap">
+      <div class="lbl"><span>Fullførte moduler</span><span>${done} / ${MODULER.length}</span></div>
+      <div class="progress"><i style="width:${done/MODULER.length*100}%"></i></div>
+    </div>`;
+  MODULER.forEach(m=>{
+    const isDone = !!p.training[m.id];
+    html += `
+    <div class="card">
+      <div class="module-head" onclick="toggleMod('${m.id}')">
+        <div class="ico">${m.ikon}</div>
+        <div class="t"><strong>${m.tittel}</strong><span>${m.punkter.length} punkter</span></div>
+        <div class="check-dot ${isDone?'done':''}">${isDone?'✓':''}</div>
+      </div>
+      <div class="module-body hidden" id="body-${m.id}">
+        <ul>${m.punkter.map(x=>`<li>${x}</li>`).join("")}</ul>
+        <button class="btn ${isDone?'ghost':''} sm" style="width:100%;margin-top:6px"
+          onclick="markMod('${m.id}',event)">
+          ${isDone?'✓ Markert som gjennomgått – angre':'Marker som gjennomgått'}
+        </button>
+      </div>
+    </div>`;
+  });
+  document.getElementById("view-opp").innerHTML = html;
+}
+function toggleMod(id){ document.getElementById("body-"+id).classList.toggle("hidden"); }
+function markMod(id,e){
+  e.stopPropagation();
+  const d = db(); const p = d.people[current.name];
+  p.training[id] = !p.training[id];
+  saveDb(d); renderOpp();
+  document.getElementById("body-"+id).classList.remove("hidden");
+}
+
+/* ---------- Utsjekk ---------- */
+function renderUts(){
+  const d = db(); const p = d.people[current.name];
+  const done = Object.values(p.checklist).filter(Boolean).length;
+  const allDone = done === CHK_TOTAL;
+
+  let html = `
+    <div class="card prog-wrap">
+      <div class="lbl"><span>Sjekkliste fullført</span><span>${done} / ${CHK_TOTAL}</span></div>
+      <div class="progress"><i style="width:${done/CHK_TOTAL*100}%"></i></div>
+    </div>
+    <div class="card">`;
+  SJEKKLISTE.forEach(g=>{
+    html += `<div class="group-title">${g.gruppe}</div>`;
+    g.items.forEach(it=>{
+      const c = !!p.checklist[it.id];
+      html += `
+      <div class="chk-item">
+        <input type="checkbox" id="${it.id}" ${c?'checked':''} onchange="toggleChk('${it.id}')" />
+        <label for="${it.id}">${it.tekst}<span class="hint">${it.hint}</span></label>
+      </div>`;
+    });
+  });
+  html += `</div>`;
+
+  // Sign-off block
+  if(p.signedOff){
+    html += `
+    <div class="card signoff">
+      <span class="badge">✓ Utsjekk godkjent</span>
+      <p style="margin:10px 0 0;font-size:.9rem">
+        Godkjent av <strong>${p.signedOff.by}</strong> – ${p.signedOff.date}
+      </p>
+    </div>`;
+  } else if(!allDone){
+    html += `<div class="card signoff locked">
+      <strong>Utsjekk ikke klar</strong>
+      <p style="margin:6px 0 0;font-size:.9rem;color:var(--muted)">
+        Alle punktene må være huket av før utsjekk kan godkjennes.</p>
+    </div>`;
+  } else if(current.role==="Instruktør"){
+    html += `<div class="card signoff">
+      <strong>Alle punkter fullført ✓</strong>
+      <p style="margin:6px 0 12px;font-size:.9rem;color:var(--muted)">
+        Som instruktør kan du godkjenne utsjekken nå.</p>
+      <button class="btn sm" style="width:100%" onclick="signOff()">Godkjenn utsjekk for ${current.name}</button>
+    </div>`;
+  } else {
+    html += `<div class="card signoff">
+      <strong>Klar for utsjekk ✓</strong>
+      <p style="margin:6px 0 0;font-size:.9rem;color:var(--muted)">
+        Alle punkter er fullført. En instruktør må logge inn og godkjenne utsjekken din.</p>
+    </div>`;
+  }
+  document.getElementById("view-uts").innerHTML = html;
+}
+function toggleChk(id){
+  const d = db(); const p = d.people[current.name];
+  p.checklist[id] = !p.checklist[id];
+  saveDb(d); renderUts();
+}
+function signOff(){
+  const d = db(); const p = d.people[current.name];
+  p.signedOff = { by: current.name, date: new Date().toLocaleDateString("no-NO",{day:"2-digit",month:"long",year:"numeric"}) };
+  saveDb(d); renderUts();
+}
+
+/* ---------- Oversikt ---------- */
+function renderOvr(){
+  const d = db();
+  const names = Object.keys(d.people);
+  let rows = "";
+  names.forEach(n=>{
+    const p = d.people[n];
+    const tDone = MODULER.filter(m=>p.training[m.id]).length;
+    const cDone = Object.values(p.checklist).filter(Boolean).length;
+    const utsOk = !!p.signedOff;
+    rows += `
+    <tr>
+      <td><strong>${n}</strong><br><span style="color:var(--muted);font-size:.8rem">${p.role}</span></td>
+      <td>${tDone}/${MODULER.length}</td>
+      <td>${cDone}/${CHK_TOTAL}</td>
+      <td>${utsOk
+        ? `<span class="pill ok">Godkjent</span>`
+        : `<span class="pill wait">Underveis</span>`}</td>
+    </tr>`;
+  });
+  const html = names.length ? `
+    <h2 class="section">Mannskapsoversikt</h2>
+    <div class="card">
+      <table>
+        <thead><tr><th>Navn</th><th>Opplæring</th><th>Sjekkliste</th><th>Utsjekk</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <p class="note">Oversikten viser alle som har logget inn på denne maskinen.</p>`
+    : `<div class="card"><div class="empty">Ingen registrerte mannskaper ennå.</div></div>`;
+  document.getElementById("view-ovr").innerHTML = html;
+}
+
+/* ---------- Oppstart ---------- */
+(function init(){
+  const saved = localStorage.getItem("rosesol_current");
+  if(saved){ current = JSON.parse(saved); enterApp(); }
+})();
+</script>
+</body>
+</html>
