@@ -269,7 +269,7 @@
       <button id="tab-opp" class="active" onclick="showTab('opp')">Opplæring</button>
       <button id="tab-quiz" onclick="showTab('quiz')">Teoriprøve</button>
       <button id="tab-dipl" onclick="showTab('dipl')">Kursbevis</button>
-      <button id="tab-ovr" onclick="showTab('ovr')">Oversikt</button>
+      <button id="tab-ovr" onclick="showTab('ovr')">For assessor</button>
     </nav>
 
     <section id="view-opp"></section>
@@ -883,20 +883,32 @@ let adminRows=[]; let adminOnline=false; let lastAdminFiltered=[];
 async function renderAdmin(code){
   const panel=document.getElementById("adminPanel");
   panel.innerHTML='<h2 style="margin:0 0 10px">Kandidatoversikt</h2><p style="color:var(--muted)">Henter kandidater &hellip;</p>';
-  let rows=null; adminOnline=false;
+  let cloudRows=null; adminOnline=false; let httpInfo="";
   if(SB_URL&&SB_KEY){
     try{
       const r=await fetch(SB_URL+"/rest/v1/rpc/admin_results",{method:"POST",
         headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"},
         body:JSON.stringify({p_code:code||""})});
-      if(r.ok){ rows=await r.json(); adminOnline=true; }
-    }catch(e){}
+      httpInfo="HTTP "+r.status;
+      if(r.ok){ cloudRows=await r.json(); adminOnline=true; }
+    }catch(e){ httpInfo="nettverksfeil"; }
   }
-  if(rows===null){ const d=db(); rows=Object.keys(d.people).map(n=>sbRow(d.people[n])); }
-  adminRows=(rows||[]).filter(x=>x && x.cid && !String(x.cid).startsWith("_"));
+  const d=db();
+  const localRows=Object.keys(d.people).map(n=>sbRow(d.people[n])).filter(x=>x&&x.cid&&!String(x.cid).startsWith("_"));
+  const byCid={};
+  (cloudRows||[]).forEach(x=>{ if(x&&x.cid){ x._src="sky"; byCid[x.cid]=x; } });
+  let localOnly=0;
+  localRows.forEach(x=>{ if(!byCid[x.cid]){ x._src="lokal"; byCid[x.cid]=x; localOnly++; } });
+  adminRows=Object.values(byCid);
+  const cloudCount=(cloudRows||[]).length;
+  const statusPill = adminOnline
+    ? `<span class="pill ok">✓ Tilkoblet skydatabasen</span> <span style="color:var(--muted);font-size:.8rem">${cloudCount} i sky</span>`
+    : `<span class="pill wait">⚠ Ingen kontakt med sky (${httpInfo||"–"})</span>`;
+  const warn = localOnly>0
+    ? `<p style="margin:8px 0 0;font-size:.84rem;color:#b9770a">${localOnly} resultat vises kun lokalt – ikke synkronisert til sky. Trykk «Synk lokale → sky».</p>` : "";
   panel.innerHTML=`<h2 style="margin:0 0 2px">Kandidatoversikt</h2>
-    <p style="margin:0 0 12px"><span class="pill ${adminOnline?'ok':'wait'}">${adminOnline?'✓ Tilkoblet skydatabasen':'⚠ Ingen kontakt – viser lokale data'}</span></p>
-    <div class="adm-controls">
+    <p style="margin:0 0 4px">${statusPill}</p>${warn}
+    <div class="adm-controls" style="margin-top:12px">
       <input id="admSearch" type="text" placeholder="Søk navn / assessor" oninput="applyAdminFilter()"/>
       <select id="admVessel" onchange="applyAdminFilter()"><option value="all">Alle fartøy</option><option value="Rosesol">Rosesol</option><option value="Roseflora">Roseflora</option></select>
       <select id="admStatus" onchange="applyAdminFilter()"><option value="all">Alle</option><option value="passed">Bestått</option><option value="failed">Ikke bestått</option><option value="none">Ikke tatt</option></select>
@@ -904,11 +916,29 @@ async function renderAdmin(code){
     <div id="admTableWrap"></div>
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
       <button class="btn ghost sm" onclick="renderAdmin(adminCodeCur)">Oppdater</button>
+      <button class="btn ghost sm" onclick="adminResync()">Synk lokale → sky</button>
       <button class="btn ghost sm" onclick="adminExportCSV()">Last ned CSV</button>
       <button class="btn sm" style="background:#c92e3b" onclick="deleteShown()">Slett alle viste</button>
       <button class="btn sm" onclick="closeAdmin()">Lukk</button>
     </div>`;
   applyAdminFilter();
+}
+async function adminResync(){
+  if(!(SB_URL&&SB_KEY)){ alert("Ingen skydatabase konfigurert."); return; }
+  const d=db(); const keys=Object.keys(d.people).filter(k=>!String(k).startsWith("_"));
+  if(!keys.length){ alert("Ingen lokale resultater å sende."); return; }
+  let last=""; let okCount=0;
+  for(const k of keys){
+    try{
+      const r=await fetch(SB_URL+"/rest/v1/results",{method:"POST",
+        headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=minimal"},
+        body:JSON.stringify(sbRow(d.people[k]))});
+      last="HTTP "+r.status;
+      if(r.ok){ okCount++; } else { last+=" – "+(await r.text()).slice(0,160); }
+    }catch(e){ last="Nettverksfeil: "+((e&&e.message)||e); }
+  }
+  alert("Forsøkte å sende "+keys.length+" resultat(er) til skyen.\nVellykket: "+okCount+"\nSiste svar: "+last);
+  renderAdmin(adminCodeCur);
 }
 function adminFiltered(){
   const q=(document.getElementById("admSearch").value||"").toLowerCase();
@@ -932,7 +962,7 @@ function applyAdminFilter(){
   rows.forEach((x,idx)=>{
     let prove='<span class="pill wait">Ikke tatt</span>';
     if(x.quiz_total!=null){ prove=`${x.quiz_score}/${x.quiz_total} `+(x.quiz_passed?'<span class="pill ok">Bestått</span>':'<span class="pill wait">Ikke bestått</span>'); }
-    body+=`<tr><td><strong>${x.name||""}</strong></td><td>${x.fodsel||""}</td><td>${x.vessel||""}</td><td>${x.role||""}</td>
+    body+=`<tr><td><strong>${x.name||""}</strong>${x._src==="lokal"?' <span class="pill wait" style="font-size:.6rem">kun lokalt</span>':''}</td><td>${x.fodsel||""}</td><td>${x.vessel||""}</td><td>${x.role||""}</td>
       <td>${x.training_done?'<span class="pill ok">Signert</span>':'—'}</td><td>${prove}</td>
       <td>${x.diploma_signed?'<span class="pill ok">Signert</span>':'—'}</td><td>${admDate(x)}</td>
       <td><button class="btn-del" onclick="deleteByRow(${idx})">Slett</button></td></tr>`;
@@ -1008,9 +1038,15 @@ window.addEventListener("beforeinstallprompt",e=>{
   };
 });
 window.addEventListener("appinstalled",()=>{ const b=document.getElementById("installBar"); if(b) b.classList.add("hidden"); });
+function pwaIsAndroid(){ return /android/i.test(navigator.userAgent); }
+function pwaIsMobile(){ return pwaIsIOS()||pwaIsAndroid()||/mobile/i.test(navigator.userAgent); }
 window.addEventListener("load",()=>{
-  if(pwaIsIOS() && !pwaStandalone() && !ibDismissed()){
-    setTimeout(()=>showInstallBar("Trykk Del-knappen og velg «Legg til på Hjemskjerm».", false), 1200);
+  if(pwaStandalone()||ibDismissed()) return;
+  if(pwaIsIOS()){
+    setTimeout(()=>{ if(!ibDismissed()&&!pwaStandalone()) showInstallBar("Trykk Del-knappen nederst og velg «Legg til på Hjemskjerm».", false); }, 1200);
+  } else if(pwaIsMobile()){
+    // Android: bruk systemprompten hvis den finnes, ellers vis veiledning
+    setTimeout(()=>{ if(deferredPrompt||ibDismissed()||pwaStandalone()) return; showInstallBar("Åpne menyen (⋮) og velg «Legg til på startskjerm».", false); }, 2500);
   }
 });
 
