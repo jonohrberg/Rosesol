@@ -999,8 +999,10 @@ async function sbDelete(cid){
     body:JSON.stringify({p_code:adminCodeCur, p_cid:cid})}); }catch(e){}
 }
 function removeLocal(cid){
-  try{ const parts=String(cid).split("|"); const lk=parts[0]+"|"+(parts[1]||"");
-    const d=db(); if(d.people[lk] && (d.people[lk].vessel||"")===(parts[2]||"")){ delete d.people[lk]; saveDb(d); } }catch(e){}
+  try{ const d=db(); let changed=false;
+    Object.keys(d.people).forEach(k=>{ try{ if(sbRow(d.people[k]).cid===cid){ delete d.people[k]; changed=true; } }catch(e){} });
+    if(changed) saveDb(d);
+  }catch(e){}
 }
 async function deleteCandidate(cid){
   if(!confirm("Slette dette resultatet permanent? Dette kan ikke angres.")) return;
