@@ -141,6 +141,12 @@
   .sigclear{position:absolute;top:8px;right:8px;background:#eef2f7;border:1px solid var(--line);
             border-radius:7px;padding:3px 9px;font-size:.78rem;color:var(--blue);cursor:pointer}
   .siglbl{display:block;font-size:.78rem;color:var(--muted);margin:3px 2px 8px}
+  .prax-btns{display:flex;gap:8px;margin:10px 0 8px;flex-wrap:wrap}
+  .prax-b{flex:1;min-width:110px;border:1px solid var(--line);background:#fff;border-radius:9px;padding:10px 8px;font-size:.82rem;font-weight:600;color:var(--muted);cursor:pointer}
+  .prax-b.ok{background:var(--okbg);border-color:#bce6c9;color:var(--ok)}
+  .prax-b.warn{background:#fff4e0;border-color:#f0dcb0;color:#b9770a}
+  .prax-b.no{background:#fbecec;border-color:#f0c9cd;color:#c92e3b}
+  .prax-c{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-size:.85rem}
   .cert-sigs{display:flex;gap:18px;justify-content:center;margin:14px 4px 2px;flex-wrap:wrap}
   .cert-sigs .cs{flex:1;min-width:140px;max-width:230px}
   .cert-sigs .cs img{width:100%;height:54px;object-fit:contain;border-bottom:1px solid #cdd9e6;background:#fff}
@@ -199,7 +205,7 @@
   @media (max-width:560px){
     .wrap{padding:14px}
     nav.tabs{gap:4px;padding:5px}
-    nav.tabs button{padding:9px 3px;font-size:.78rem}
+    nav.tabs button{padding:8px 2px;font-size:.72rem}
     .q{padding:14px 14px}
     .q .qtext{font-size:1rem}
     .chk-item{padding:14px}
@@ -272,12 +278,14 @@
     <nav class="tabs">
       <button id="tab-opp" class="active" onclick="showTab('opp')">Opplæring</button>
       <button id="tab-quiz" onclick="showTab('quiz')">Teoriprøve</button>
+      <button id="tab-prak" onclick="showTab('prak')">Praktisk</button>
       <button id="tab-dipl" onclick="showTab('dipl')">Kursbevis</button>
       <button id="tab-ovr" onclick="showTab('ovr')">For assessor</button>
     </nav>
 
     <section id="view-opp"></section>
     <section id="view-quiz" class="hidden"></section>
+    <section id="view-prak" class="hidden"></section>
     <section id="view-dipl" class="hidden"></section>
     <section id="view-ovr" class="hidden"></section>
   </div>
@@ -429,7 +437,7 @@ function enterApp(){
 }
 
 /* ---------- Faner ---------- */
-const TABS=["opp","quiz","dipl","ovr"];
+const TABS=["opp","quiz","prak","dipl","ovr"];
 function showTab(t){
   TABS.forEach(x=>{
     document.getElementById("view-"+x).classList.toggle("hidden", x!==t);
@@ -437,6 +445,7 @@ function showTab(t){
   });
   if(t==="opp")renderOpp();
   if(t==="quiz")renderQuiz();
+  if(t==="prak")renderPrak();
   if(t==="dipl")renderDipl();
   if(t==="ovr")renderOvr();
   updateArrows();
@@ -752,6 +761,11 @@ function renderDipl(){
     html+=`<button class="btn noprint" onclick="lastNedKursbevisPDF()">Last ned PDF (kursbevis)</button>
       <button class="btn ghost noprint" style="margin-top:8px" onclick="angreDiplomaSign()">Angre signering</button>`;
   }
+  if(p.practical && p.practical.signed){
+    html+=`<div class="card signoff"><strong>Samlet kompetansebevis</strong>
+      <p style="margin:6px 0 10px;font-size:.9rem;color:var(--muted)">Både teori og praktisk utsjekk er bestått.</p>
+      <button class="btn noprint" style="width:100%;margin-top:0" onclick="lastNedKompetansebevisPDF()">Last ned samlet kompetansebevis</button></div>`;
+  }
   view.innerHTML=html;
   if(showForm){
     padAss=makePad(document.getElementById("sigAss"));
@@ -822,6 +836,197 @@ function lastNedKursbevisPDF(){
   doc.text(safe("Referanse: "+p.quiz.ref+"   ·   Generert "+new Date().toLocaleString("no-NO")), W/2, 280, {align:"center"});
   doc.save("Kursbevis-"+(""+current.name).replace(/\s+/g,"-")+".pdf");
 }
+/* ---------- Praktisk utsjekk (del 2) ---------- */
+const PRAKSIS = [
+  {id:"k1", t:"Klargjøring og sikkerhetssjekk før avgang"},
+  {id:"k2", t:"Oppstart og motorkontroll"},
+  {id:"k3", t:"Manøvrering og fartskontroll"},
+  {id:"k4", t:"Legge opp og følge rute i TECDIS"},
+  {id:"k5", t:"Navigasjon i farvannet"},
+  {id:"k6", t:"Legge til og fra kai (fortøyning)"},
+  {id:"k7", t:"VHF og kommunikasjon"},
+  {id:"k8", t:"Mann-over-bord-manøver"},
+  {id:"k9", t:"Øvelse: brann i maskinrom"},
+  {id:"k10", t:"Pasient/båre om bord og sikring"}
+];
+let padAssP=null, padKanP=null;
+function praksisTittel(it){ return it.id==="k5" ? ("Navigasjon i "+(FARVANN[current.vessel]||"farvannet")) : it.t; }
+function renderPrak(){
+  const view=document.getElementById("view-prak");
+  const d=db(); const p=d.people[curKey()];
+  if(!(p.quiz && p.quiz.passed)){
+    view.innerHTML=`<div class="card"><div class="locktab"><div class="big">🔒</div>
+      <strong>Praktisk utsjekk er låst</strong><p style="margin:6px 0 0">Bestå teoriprøven først. Den praktiske utsjekken gjennomføres om bord sammen med assessor.</p></div></div>`;
+    return;
+  }
+  p.practical = p.practical || {items:{}, signed:null};
+  const items=p.practical.items;
+  const klar=it=>{ const s=items[it.id]&&items[it.id].status; return s && s!=="Må trenes mer"; };
+  const done=PRAKSIS.filter(klar).length;
+  const allOk=PRAKSIS.every(klar);
+  let html=`<div class="card prog-wrap">
+      <div class="lbl"><span>Klare øvelser (godkjent/anbefalt)</span><span>${done} / ${PRAKSIS.length}</span></div>
+      <div class="progress"><i style="width:${done/PRAKSIS.length*100}%"></i></div>
+    </div>
+    <div class="card" style="padding:14px 16px"><p style="margin:0;font-size:.9rem;color:var(--muted)">Gjennomføres om bord på <strong>${current.vessel}</strong>. Assessor vurderer hver øvelse.</p></div>`;
+  PRAKSIS.forEach(it=>{
+    const cur=items[it.id]||{}; const st=cur.status||"";
+    html+=`<div class="card" style="padding:14px 16px">
+      <strong style="font-size:.96rem">${praksisTittel(it)}</strong>
+      <div class="prax-btns">
+        <button class="prax-b ${st==='Godkjent'?'ok':''}" onclick="setPrax('${it.id}','Godkjent')">✓ Godkjent</button>
+        <button class="prax-b ${st==='Anbefales mer trening'?'warn':''}" onclick="setPrax('${it.id}','Anbefales mer trening')">Anbefales mer trening</button>
+        <button class="prax-b ${st==='Må trenes mer'?'no':''}" onclick="setPrax('${it.id}','Må trenes mer')">Må trenes mer</button>
+      </div>
+      <input class="prax-c" type="text" placeholder="Kommentar (valgfri)" value="${(cur.comment||'').replace(/"/g,'&quot;')}" onchange="setPraxComment('${it.id}',this.value)"/>
+    </div>`;
+  });
+  if(p.practical.signed){
+    const s=p.practical.signed;
+    html+=`<div class="card signoff"><span class="badge">✓ Praktisk utsjekk godkjent</span>
+      <p style="margin:10px 0 0;font-size:.92rem">Assessor: <strong>${s.assessor}</strong> (sert. ${s.assessorCert}) · ${s.date}</p>
+      <button class="btn sm noprint" style="width:100%;margin-top:10px" onclick="lastNedPraktiskPDF()">Last ned PDF (praktisk utsjekk)</button>
+      <button class="btn sm ghost noprint" style="width:100%;margin-top:8px" onclick="angrePractical()">Angre signering</button></div>`;
+  } else if(!allOk){
+    html+=`<div class="card signoff locked"><strong>Ikke klar for signering</strong>
+      <p style="margin:6px 0 0;font-size:.9rem;color:var(--muted)">Alle øvelser må vurderes, og ingen kan stå på «Må trenes mer», før praktisk utsjekk kan signeres.</p></div>`;
+  } else {
+    html+=`<div class="card" style="padding:18px">
+      <h2 class="section" style="margin-top:0">Signér praktisk utsjekk</h2>
+      <p style="font-size:.9rem;color:var(--muted);margin:0 0 14px">Alle øvelser er godkjent. Assessor og kandidat signerer.</p>
+      <label>Assessor – navn</label><input id="pAssName" type="text" placeholder="Assessorens navn"/>
+      <div class="sigwrap"><canvas id="pSigAss" class="sigpad"></canvas><button type="button" class="sigclear" onclick="padAssP&&padAssP.clear()">Tøm</button></div>
+      <span class="siglbl">Signatur assessor</span>
+      <label>Assessorsertifikatnummer</label><input id="pAssCert" type="text" placeholder="Assessorens sertifikatnummer"/>
+      <label>Kandidat – navn</label><input id="pKanName" type="text" value="${current.name}"/>
+      <div class="sigwrap"><canvas id="pSigKan" class="sigpad"></canvas><button type="button" class="sigclear" onclick="padKanP&&padKanP.clear()">Tøm</button></div>
+      <span class="siglbl">Signatur kandidat</span>
+      <button class="btn" onclick="confirmPractical()">Bekreft og signér praktisk utsjekk</button>
+    </div>`;
+  }
+  view.innerHTML=html;
+  if(allOk && !p.practical.signed){
+    padAssP=makePad(document.getElementById("pSigAss"));
+    padKanP=makePad(document.getElementById("pSigKan"));
+  }
+}
+function setPrax(id,status){
+  const d=db(); const p=d.people[curKey()]; p.practical=p.practical||{items:{},signed:null};
+  p.practical.items[id]=p.practical.items[id]||{}; p.practical.items[id].status=status;
+  saveDb(d); renderPrak();
+}
+function setPraxComment(id,val){
+  const d=db(); const p=d.people[curKey()]; p.practical=p.practical||{items:{},signed:null};
+  p.practical.items[id]=p.practical.items[id]||{}; p.practical.items[id].comment=val;
+  saveDb(d);
+}
+function confirmPractical(){
+  const ass=document.getElementById("pAssName").value.trim();
+  const cert=document.getElementById("pAssCert").value.trim();
+  const kan=document.getElementById("pKanName").value.trim();
+  if(!ass){ alert("Skriv inn assessorens navn."); return; }
+  if(!cert){ alert("Skriv inn assessorsertifikatnummer."); return; }
+  if(!kan){ alert("Skriv inn kandidatens navn."); return; }
+  if(!padAssP || padAssP.isEmpty()){ alert("Assessor må signere i feltet."); return; }
+  if(!padKanP || padKanP.isEmpty()){ alert("Kandidaten må signere i feltet."); return; }
+  const d=db(); const p=d.people[curKey()];
+  p.practical.signed={ assessor:ass, assessorCert:cert, candidate:kan,
+    assessorSig:padAssP.dataURL(), candidateSig:padKanP.dataURL(),
+    date:new Date().toLocaleDateString("no-NO",{day:"2-digit",month:"long",year:"numeric"}),
+    ref:(current.vessel.slice(0,3).toUpperCase()+"-PRA-"+Date.now().toString().slice(-6)) };
+  saveDb(d); sbSync(curKey()); renderPrak();
+  alert("Praktisk utsjekk er signert og godkjent. Samlet kompetansebevis er klart under «Kursbevis».");
+}
+function angrePractical(){
+  if(!confirm("Angre signering av praktisk utsjekk?")) return;
+  const d=db(); const p=d.people[curKey()]; if(p.practical) p.practical.signed=null; saveDb(d); sbSync(curKey()); renderPrak();
+}
+function lastNedPraktiskPDF(){
+  const d=db(); const p=d.people[curKey()]; const pr=p.practical;
+  if(!(pr && pr.signed)){ alert("Signér praktisk utsjekk først."); return; }
+  if(!(window.jspdf && window.jspdf.jsPDF)){ alert("PDF-verktøyet er ikke ferdig lastet ennå. Prøv igjen om et par sekunder."); return; }
+  const safe=s=>(""+s).replace(/[–—]/g,"-");
+  const { jsPDF }=window.jspdf;
+  const doc=new jsPDF({unit:"mm",format:"a4"});
+  const W=210, M=16, BLUE=[11,61,102], BLUE2=[20,89,143], GREEN=[31,157,85], INK=[34,44,58], GREY=[120,132,148];
+  doc.setFillColor(BLUE[0],BLUE[1],BLUE[2]); doc.rect(0,0,W,34,"F");
+  doc.setFillColor(GREEN[0],GREEN[1],GREEN[2]); doc.rect(0,34,W,2,"F");
+  doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.setFontSize(19);
+  doc.text("Bevis for praktisk utsjekk", M, 17);
+  doc.setFont("helvetica","normal"); doc.setFontSize(9.3); doc.setTextColor(200,216,232);
+  doc.text(safe("Hurtiggående fartøy · fartøys- og farvannsspesifikk utsjekk · §65"), M, 25);
+  doc.setFillColor(GREEN[0],GREEN[1],GREEN[2]); doc.roundedRect(W-M-30,9,30,11,5.5,5.5,"F");
+  doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.setFontSize(8.3);
+  doc.text("BESTÅTT", W-M-15, 16, {align:"center"});
+  const cardY=44; doc.setFillColor(244,247,250); doc.roundedRect(M,cardY,W-2*M,30,3,3,"F");
+  const f=FARVANN[current.vessel]||"";
+  function field(x,yy,label,val){ doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(BLUE2[0],BLUE2[1],BLUE2[2]); doc.text(safe(label).toUpperCase(),x,yy);
+    doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor(INK[0],INK[1],INK[2]); doc.text(safe(val||"-"),x,yy+6); }
+  field(M+8,cardY+9,"Kandidat",pr.signed.candidate);
+  field(W/2+2,cardY+9,"Fartøy / farvann",current.vessel+(f?" ("+f+")":""));
+  field(M+8,cardY+21,"Født",current.fodsel);
+  field(W/2+2,cardY+21,"Dato",pr.signed.date);
+  let y=cardY+30+12;
+  doc.setFont("helvetica","bold"); doc.setFontSize(11.5); doc.setTextColor(BLUE[0],BLUE[1],BLUE[2]);
+  doc.text("Gjennomførte øvelser", M, y);
+  doc.setDrawColor(GREEN[0],GREEN[1],GREEN[2]); doc.setLineWidth(0.7); doc.line(M,y+2.5,M+44,y+2.5);
+  y+=8; doc.setFontSize(9);
+  PRAKSIS.forEach((it,i)=>{
+    const it2=(pr.items[it.id]||{}); const st=it2.status||"-";
+    doc.setFillColor(GREEN[0],GREEN[1],GREEN[2]); doc.circle(M+1,y-1.2,1.1,"F");
+    doc.setTextColor(INK[0],INK[1],INK[2]); doc.setFont("helvetica","normal");
+    doc.text(safe((i+1)+". "+praksisTittel(it)), M+5, y, {maxWidth:120});
+    const col=st==="Godkjent"?GREEN:(st==="Anbefales mer trening"?[185,119,10]:[201,46,59]);
+    doc.setTextColor(col[0],col[1],col[2]); doc.setFont("helvetica","bold");
+    doc.text(safe(st), W-M, y, {align:"right"});
+    y+=6;
+    if(it2.comment){ doc.setTextColor(GREY[0],GREY[1],GREY[2]); doc.setFont("helvetica","italic"); doc.setFontSize(8); doc.text(safe("    "+it2.comment), M+5, y, {maxWidth:150}); doc.setFontSize(9); y+=5; }
+  });
+  const sigY=Math.max(y+18, 248);
+  if(pr.signed.assessorSig) doc.addImage(pr.signed.assessorSig,"PNG",M,sigY-24,75,22);
+  if(pr.signed.candidateSig) doc.addImage(pr.signed.candidateSig,"PNG",W-M-75,sigY-24,75,22);
+  doc.setDrawColor(180,190,200); doc.setLineWidth(0.4); doc.line(M,sigY,M+75,sigY); doc.line(W-M-75,sigY,W-M,sigY);
+  doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.setTextColor(INK[0],INK[1],INK[2]);
+  doc.text("Assessor", M, sigY+5); doc.text("Kandidat", W-M-75, sigY+5);
+  doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(GREY[0],GREY[1],GREY[2]);
+  doc.text(safe(pr.signed.assessor+"  ·  sert. "+pr.signed.assessorCert), M, sigY+10);
+  doc.text(safe(pr.signed.candidate), W-M-75, sigY+10);
+  doc.setFontSize(7.5); doc.text(safe("Referanse: "+pr.signed.ref), M, 288);
+  doc.save("Praktisk-utsjekk-"+(""+current.name).replace(/\s+/g,"-")+".pdf");
+}
+function lastNedKompetansebevisPDF(){
+  const d=db(); const p=d.people[curKey()];
+  if(!(p.quiz&&p.quiz.passed)){ alert("Bestå teoriprøven først."); return; }
+  if(!(p.practical&&p.practical.signed)){ alert("Fullfør praktisk utsjekk først."); return; }
+  if(!(window.jspdf&&window.jspdf.jsPDF)){ alert("PDF-verktøyet er ikke ferdig lastet ennå. Prøv igjen om et par sekunder."); return; }
+  const safe=s=>(""+s).replace(/[–—]/g,"-");
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:"mm",format:"a4"});
+  const W=210,M=18; const s=p.practical.signed; const f=FARVANN[current.vessel]||"";
+  doc.setDrawColor(11,61,102); doc.setLineWidth(1.4); doc.rect(10,10,W-20,277);
+  doc.setLineWidth(0.3); doc.setDrawColor(150); doc.rect(13,13,W-26,271);
+  doc.setTextColor(20,89,143); doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.text("KOMPETANSEBEVIS",W/2,32,{align:"center"});
+  doc.setTextColor(11,61,102); doc.setFontSize(24); doc.text(safe("Hurtiggående fartøy"),W/2,48,{align:"center"});
+  doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(90,90,90);
+  doc.text(safe("Teoretisk og praktisk utsjekk · forskrift 22.12.2011 nr. 1523 §65"),W/2,58,{align:"center"});
+  doc.setFontSize(11); doc.setTextColor(40,50,65); doc.text("Dette bekrefter at",W/2,76,{align:"center"});
+  doc.setFont("helvetica","bold"); doc.setFontSize(20); doc.setTextColor(11,61,102); doc.text(safe(current.name),W/2,88,{align:"center"});
+  doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor(40,50,65);
+  doc.text(safe(current.role+" · "+current.vessel+(f?" ("+f+")":"")+" · f. "+(current.fodsel||"-")),W/2,97,{align:"center"});
+  doc.text(safe("har gjennomført opplæring, bestått teoriprøven ("+p.quiz.score+"/"+p.quiz.total+")"),W/2,110,{align:"center"});
+  doc.text(safe("og bestått fartøys- og farvannsspesifikk praktisk utsjekk."),W/2,117,{align:"center"});
+  doc.setDrawColor(31,157,85); doc.setLineWidth(1.6); doc.circle(W/2,140,15);
+  doc.setTextColor(31,157,85); doc.setFont("helvetica","bold"); doc.setFontSize(15); doc.text("OK",W/2,139,{align:"center"});
+  doc.setFontSize(6.5); doc.text("GODKJENT",W/2,145,{align:"center"});
+  const sy=205;
+  if(s.assessorSig) doc.addImage(s.assessorSig,"PNG",W/2-37,sy-24,74,22);
+  doc.setDrawColor(150); doc.setLineWidth(0.4); doc.line(W/2-37,sy,W/2+37,sy);
+  doc.setFont("helvetica","bold"); doc.setFontSize(9); doc.setTextColor(60,70,85); doc.text(safe("Assessor: "+s.assessor),W/2,sy+6,{align:"center"});
+  doc.setFont("helvetica","normal"); doc.setFontSize(8.5); doc.setTextColor(90,90,90); doc.text(safe("Sertifikatnr: "+s.assessorCert+"  ·  Dato: "+s.date),W/2,sy+11,{align:"center"});
+  doc.setFontSize(7.5); doc.setTextColor(130,130,130);
+  doc.text(safe("Teori-ref: "+(p.quiz.ref||"-")+"   ·   Praksis-ref: "+s.ref),W/2,280,{align:"center"});
+  doc.save("Kompetansebevis-"+(""+current.name).replace(/\s+/g,"-")+".pdf");
+}
+
 
 
 /* ---------- Oversikt ---------- */
@@ -852,6 +1057,11 @@ function sbRow(p){
     diploma_signed:!!p.diplomaSign,
     assessor:(p.diplomaSign&&p.diplomaSign.assessor)||null,
     assessor_cert:(p.diplomaSign&&p.diplomaSign.assessorCert)||null,
+    practical_signed:!!(p.practical&&p.practical.signed),
+    practical_date:(p.practical&&p.practical.signed&&p.practical.signed.date)||null,
+    practical_assessor:(p.practical&&p.practical.signed&&p.practical.signed.assessor)||null,
+    practical_cert:(p.practical&&p.practical.signed&&p.practical.signed.assessorCert)||null,
+    practical_items:p.practical?JSON.stringify(p.practical.items||{}):null,
     ref:p.quiz?p.quiz.ref:null,
     updated_at:new Date().toISOString()
   };
@@ -973,19 +1183,20 @@ function applyAdminFilter(){
       <td>${x.training_done?'<span class="pill ok">Signert</span>':'—'}</td>
       <td>${prove}</td>
       <td>${x.diploma_signed?'<span class="pill ok">Signert</span>':'—'}</td>
+      <td>${x.practical_signed?'<span class="pill ok">Bestått</span>':'—'}</td>
       <td class="sub2">${admDate(x)}</td>
       <td><button class="btn-del" onclick="deleteByRow(${idx})">Slett</button></td></tr>`;
   });
   document.getElementById("admTableWrap").innerHTML=`
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 10px">${rows.length} vist · ${taken} har tatt prøven · ${passed} bestått</p>
     ${rows.length?`<div style="overflow-x:auto"><table class="adm-table">
-      <thead><tr><th>Kandidat</th><th>Fartøy / rolle</th><th>Opplæring</th><th>Teoriprøve</th><th>Kursbevis</th><th>Dato</th><th></th></tr></thead>
+      <thead><tr><th>Kandidat</th><th>Fartøy / rolle</th><th>Opplæring</th><th>Teoriprøve</th><th>Kursbevis</th><th>Praktisk</th><th>Dato</th><th></th></tr></thead>
       <tbody>${body}</tbody></table></div>`:'<div class="empty">Ingen treff.</div>'}`;
 }
 function adminExportCSV(){
   const rows=adminFiltered();
-  const cols=["name","fodsel","vessel","role","training_done","training_date","instructor","quiz_score","quiz_total","quiz_passed","quiz_date","diploma_signed","assessor","assessor_cert","ref"];
-  const head=["Navn","Født","Fartøy","Rolle","Opplæring fullført","Opplæring dato","Opplæringsansvarlig","Score","Maks","Bestått","Prøvedato","Kursbevis signert","Assessor","Assessor sertifikatnr","Referanse"];
+  const cols=["name","fodsel","vessel","role","training_done","training_date","instructor","quiz_score","quiz_total","quiz_passed","quiz_date","diploma_signed","assessor","assessor_cert","practical_signed","practical_assessor","practical_cert","ref"];
+  const head=["Navn","Født","Fartøy","Rolle","Opplæring fullført","Opplæring dato","Opplæringsansvarlig","Score","Maks","Bestått","Prøvedato","Kursbevis signert","Assessor","Assessor sertifikatnr","Praktisk bestått","Praktisk assessor","Praktisk sert.nr","Referanse"];
   const esc=v=>{ v=(v==null?"":String(v)); return '"'+v.replace(/"/g,'""')+'"'; };
   let csv=head.map(esc).join(";")+"\n";
   rows.forEach(x=>{ csv+=cols.map(c=>esc(x[c])).join(";")+"\n"; });
