@@ -1,4 +1,4 @@
-const C="rosesol-cache-v1";
+const C="rosesol-cache-v2";
 const ASSETS=["/","/index.html","/manifest.webmanifest"];
 self.addEventListener("install",e=>{
   e.waitUntil(caches.open(C).then(c=>c.addAll(ASSETS)).catch(()=>{}).then(()=>self.skipWaiting()));
