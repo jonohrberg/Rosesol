@@ -157,6 +157,8 @@
         background:#eef2f7;color:var(--blue);font-size:15px;cursor:pointer}
   .adm-controls{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
   .adm-controls input,.adm-controls select{width:auto;flex:1;min-width:120px;padding:9px 10px;font-size:.9rem;margin:0}
+  .btn-del{background:#fbecec;color:#c92e3b;border:1px solid #f0c9cd;border-radius:7px;padding:5px 10px;font-size:.78rem;cursor:pointer;white-space:nowrap}
+  .btn-del:hover{background:#f6dcdf}
   .installbar{position:fixed;left:12px;right:12px;bottom:12px;z-index:60;display:flex;align-items:center;gap:12px;
         background:#fff;border-radius:14px;box-shadow:0 10px 30px rgba(7,33,56,.35);padding:12px 14px;max-width:560px;margin:0 auto}
   .installbar .ib-ico{font-size:24px;flex:none}
@@ -525,9 +527,10 @@ function renderOpp(){
     const td=p.trainingDone;
     html+=`<div class="card signoff">
       <span class="badge">✓ Opplæring fullført og signert</span>
-      <p style="margin:10px 0 0;font-size:.92rem">Bekreftet ${td.date} · Opplæringsansvarlig: <strong>${td.instructor}</strong></p>
-      <p style="margin:6px 0 12px;font-size:.9rem;color:var(--muted)">Teoriprøven er låst opp.</p>
-      <button class="btn sm noprint" style="width:100%" onclick="lastNedOpplaeringPDF()">Last ned PDF (fullført opplæring)</button>
+      <p style="margin:10px 0 6px;font-size:.92rem">Bekreftet ${td.date} · Opplæringsansvarlig: <strong>${td.instructor}</strong></p>
+      <p style="margin:6px 0 12px;font-size:.95rem"><strong>Neste steg:</strong> scroll opp og velg fanen «Teoriprøve» for å starte eksamen – eller trykk knappen under.</p>
+      <button class="btn noprint" style="width:100%;margin-top:0" onclick="showTab('quiz');window.scrollTo({top:0,behavior:'smooth'});">Start teoriprøven →</button>
+      <button class="btn sm ghost noprint" style="width:100%;margin-top:8px" onclick="lastNedOpplaeringPDF()">Last ned PDF (fullført opplæring)</button>
       <button class="btn sm ghost noprint" style="width:100%;margin-top:8px" onclick="angreOpplaering()">Angre signering</button>
     </div>`;
   }
@@ -553,7 +556,7 @@ function confirmTraining(){
     instructorSig:padInstr.dataURL(), candidateSig:padKand.dataURL(),
     ref:(current.vessel.slice(0,3).toUpperCase()+"-OPP-"+Date.now().toString().slice(-6)) };
   saveDb(d); renderOpp(); sbSync(curKey());
-  alert("Opplæring bekreftet og signert. Teoriprøven er nå låst opp.");
+  alert("Opplæring bekreftet og signert! Scroll opp og velg «Teoriprøve» for å starte eksamen.");
 }
 function angreOpplaering(){
   if(!confirm("Angre signering av fullført opplæring? Teoriprøven låses igjen til ny signering.")) return;
@@ -653,7 +656,7 @@ function renderQuiz(){
     html+=`</div>`;
   });
   html+=`</div><div id="quizResult"></div>
-    <button class="btn noprint" onclick="submitQuiz()">Lever inn teoriprøve</button>`;
+    <button id="quizSubmit" class="btn noprint" onclick="submitQuiz()">Lever inn teoriprøve</button>`;
   view.innerHTML=html;
 }
 function submitQuiz(){
@@ -683,6 +686,7 @@ function submitQuiz(){
       <p style="margin:6px 0 0;font-size:.9rem;color:var(--muted)">Du må ha minst ${PASS} riktige. Grønt = riktig svar. Prøv igjen.</p>
       <button class="btn sm noprint" style="width:100%;margin-top:10px" onclick="quizState={};quizData=null;renderQuiz();">Prøv på nytt</button></div>`;
   }
+  const sb=document.getElementById("quizSubmit"); if(sb) sb.style.display="none";
   res.scrollIntoView({behavior:"smooth"});
 }
 
@@ -816,25 +820,11 @@ function lastNedKursbevisPDF(){
 
 /* ---------- Oversikt ---------- */
 function renderOvr(){
-  const d=db(); const names=Object.keys(d.people);
-  let rows="";
-  names.forEach(n=>{
-    const p=d.people[n];
-    const tDone=POENG.filter((_,i)=>p.training[i]).length;
-    const passed=p.quiz && p.quiz.passed;
-    rows+=`<tr>
-      <td><strong>${n}</strong><br><span style="color:var(--muted);font-size:.8rem">${(p.vessel||"")} · ${p.role||""}</span></td>
-      <td>${tDone}/${POENG.length}${(p.trainingDone&&p.trainingDone.confirmed)?' <span class="pill ok" style="font-size:.65rem">signert</span>':''}</td>
-      <td>${passed?`<span class="pill ok">Bestått</span>`:`<span class="pill wait">Underveis</span>`}</td>
-    </tr>`;
-  });
-  const html=names.length?`<h2 class="section">Mannskapsoversikt</h2>
-    <div class="card"><table>
-      <thead><tr><th>Navn</th><th>Opplæring</th><th>Teoriprøve</th></tr></thead>
-      <tbody>${rows}</tbody></table></div>
-    <p class="note">Oversikten viser alle som har logget inn på denne maskinen.</p>`
-    :`<div class="card"><div class="empty">Ingen registrerte ennå.</div></div>`;
-  document.getElementById("view-ovr").innerHTML=html;
+  document.getElementById("view-ovr").innerHTML=`<div class="card"><div class="locktab">
+    <div class="big">🔒</div><strong>Oversikt – kun for assessor</strong>
+    <p style="margin:6px 0 12px">Krever assessor-/admin-kode for å se kandidater og resultater.</p>
+    <button class="btn sm" style="width:auto" onclick="openAdmin()">Åpne oversikt (krever kode)</button></div></div>`;
+  openAdmin();
 }
 
 /* ---------- Supabase (delt lagring) ---------- */
@@ -887,7 +877,7 @@ function adminAuth(){
   document.getElementById("adminPanel").classList.remove("hidden");
   adminCodeCur=code; renderAdmin(code);
 }
-let adminRows=[]; let adminOnline=false;
+let adminRows=[]; let adminOnline=false; let lastAdminFiltered=[];
 async function renderAdmin(code){
   const panel=document.getElementById("adminPanel");
   panel.innerHTML='<h2 style="margin:0 0 10px">Kandidatoversikt</h2><p style="color:var(--muted)">Henter kandidater &hellip;</p>';
@@ -913,6 +903,7 @@ async function renderAdmin(code){
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
       <button class="btn ghost sm" onclick="renderAdmin(adminCodeCur)">Oppdater</button>
       <button class="btn ghost sm" onclick="adminExportCSV()">Last ned CSV</button>
+      <button class="btn sm" style="background:#c92e3b" onclick="deleteShown()">Slett alle viste</button>
       <button class="btn sm" onclick="closeAdmin()">Lukk</button>
     </div>`;
   applyAdminFilter();
@@ -932,21 +923,22 @@ function adminFiltered(){
 }
 function admDate(x){ return x.quiz_date || x.training_date || (x.updated_at?String(x.updated_at).slice(0,10):"") || "—"; }
 function applyAdminFilter(){
-  const rows=adminFiltered();
+  const rows=adminFiltered(); lastAdminFiltered=rows;
   const taken=rows.filter(x=>x.quiz_total!=null).length;
   const passed=rows.filter(x=>x.quiz_passed).length;
   let body="";
-  rows.forEach(x=>{
+  rows.forEach((x,idx)=>{
     let prove='<span class="pill wait">Ikke tatt</span>';
     if(x.quiz_total!=null){ prove=`${x.quiz_score}/${x.quiz_total} `+(x.quiz_passed?'<span class="pill ok">Bestått</span>':'<span class="pill wait">Ikke bestått</span>'); }
     body+=`<tr><td><strong>${x.name||""}</strong></td><td>${x.fodsel||""}</td><td>${x.vessel||""}</td><td>${x.role||""}</td>
       <td>${x.training_done?'<span class="pill ok">Signert</span>':'—'}</td><td>${prove}</td>
-      <td>${x.diploma_signed?'<span class="pill ok">Signert</span>':'—'}</td><td>${admDate(x)}</td></tr>`;
+      <td>${x.diploma_signed?'<span class="pill ok">Signert</span>':'—'}</td><td>${admDate(x)}</td>
+      <td><button class="btn-del" onclick="deleteByRow(${idx})">Slett</button></td></tr>`;
   });
   document.getElementById("admTableWrap").innerHTML=`
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 10px">${rows.length} vist · ${taken} har tatt prøven · ${passed} bestått</p>
     ${rows.length?`<div style="overflow-x:auto"><table>
-      <thead><tr><th>Navn</th><th>Født</th><th>Fartøy</th><th>Rolle</th><th>Opplæring</th><th>Teoriprøve</th><th>Kursbevis</th><th>Dato</th></tr></thead>
+      <thead><tr><th>Navn</th><th>Født</th><th>Fartøy</th><th>Rolle</th><th>Opplæring</th><th>Teoriprøve</th><th>Kursbevis</th><th>Dato</th><th></th></tr></thead>
       <tbody>${body}</tbody></table></div>`:'<div class="empty">Ingen treff.</div>'}`;
 }
 function adminExportCSV(){
@@ -958,6 +950,29 @@ function adminExportCSV(){
   rows.forEach(x=>{ csv+=cols.map(c=>esc(x[c])).join(";")+"\n"; });
   const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="kandidater-utsjekk.csv"; document.body.appendChild(a); a.click(); a.remove();
+}
+async function sbDelete(cid){
+  if(!SB_URL||!SB_KEY) return;
+  try{ await fetch(SB_URL+"/rest/v1/rpc/admin_delete",{method:"POST",
+    headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"},
+    body:JSON.stringify({p_code:adminCodeCur, p_cid:cid})}); }catch(e){}
+}
+function removeLocal(cid){
+  try{ const parts=String(cid).split("|"); const lk=parts[0]+"|"+(parts[1]||"");
+    const d=db(); if(d.people[lk] && (d.people[lk].vessel||"")===(parts[2]||"")){ delete d.people[lk]; saveDb(d); } }catch(e){}
+}
+async function deleteCandidate(cid){
+  if(!confirm("Slette dette resultatet permanent? Dette kan ikke angres.")) return;
+  await sbDelete(cid); removeLocal(cid);
+  await renderAdmin(adminCodeCur);
+}
+function deleteByRow(i){ const x=lastAdminFiltered[i]; if(x) deleteCandidate(x.cid); }
+async function deleteShown(){
+  const rows=lastAdminFiltered.slice();
+  if(!rows.length){ alert("Ingen resultater å slette."); return; }
+  if(!confirm("Slette alle "+rows.length+" viste resultater permanent? Dette kan ikke angres.")) return;
+  for(const x of rows){ await sbDelete(x.cid); removeLocal(x.cid); }
+  await renderAdmin(adminCodeCur);
 }
 
 /* ---------- PWA: service worker + installering ---------- */
@@ -999,8 +1014,12 @@ window.addEventListener("load",()=>{
 
 /* ---------- Oppstart ---------- */
 (function init(){
-  const saved=localStorage.getItem("rosesol_current");
-  if(saved){ current=JSON.parse(saved); enterApp(); }
+  // Appen skal ALLTID starte på innloggingssiden (delt enhet)
+  localStorage.removeItem("rosesol_current");
+  current=null;
+  document.getElementById("login").classList.remove("hidden");
+  document.getElementById("app").classList.add("hidden");
+  const hb=document.getElementById("hamburger"); if(hb) hb.classList.remove("hidden");
 })();
 
 </script>
