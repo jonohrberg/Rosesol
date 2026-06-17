@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Rosesol – Opplæring og utsjekk</title>
+<title>Opplæring og utsjekk – hurtiggående fartøy</title>
+<link rel="icon" type="image/png" sizes="180x180" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAAEd0lEQVR4nO3bPW8cVRSH8fFmJZpIRMA2dBRGST5BJCgIbzWhAgpaO6aioEvs2EpHkYq18wUg5EVQ4yRQwFeIoh1qCkYgkGjBFGORmOwDm/XeOWd3n5+m8UvmXo3+PufeuZuVF96/Vknj9A8ODqLnoKR60RNQXv2qsnJovL7ZELFyCLnmEDIcQv3KrayAlUPIBamQlUPI9xxCthUh24qQW1mhvtEQsa0IuSAVcisrZOUQcs0hZDiEfM8hZOUQckEq5FZWyLYiZFsRsnIIuZUV8sheyLYi5IJUyPccQlYOIdccQm5lhawcQoZDyAWpkFtZISuHkGsOIcMh5HsOIY/shVyQCrmVFXJBKmRbEbJyCLmVFbJyCBkOIRekQr7nELJyCLnmELKtCNlWhDyyF7JyCLnmEHK3ImRbEbJyCHlkL2TlEDIcQrYVISuHkFtZISuHkGsOISuHkEf2Qi5IhTyyF7JyCLkgFbKtCNlWhGwrQtkrx+jS59FTmI2Xr34QPYWnlnrNMbpcMBm/bqw++c3nhnWp8RI/Z2Jb6UjRoBeSt62MLn8RPYWZS/qoiZWjO3MX96RH9qPNG/Sjs+unZzLE970/y938Hw/2Hh75OuXTJlYOoYxH9jWXjamNrROT/Nqrf52Y4TRGmzdWd96b4Q2LStdW6q0vo6dQWLIH/h9sK0K9qjrIcy1+2TgsjfGPepLLyiHUi07no6veuhn9NDpSb90Mf9qTXHnfkC66OXjs/egJHKqv3Cp6/yd3pGM3t7PduM67FAvS0slIqL5yK/yx/++V+sh+waV/8vFtpd6+/VS//+/TimmN/TzHrG6+GDK0lSVVb9+OfvK520q9cydy+HC5/zSWdytb8BOBE6t37qxuvhs9CxSz5vj5s2+qqvr9lz9CRteEIo/sn33+ZNzgWbR/J4OP3o6eyBjpjuyXU9NGZOOt6Ikc4cFbIs1wvxnuR8/ikeVdkKbV5mOw8Wb0RKwcWTXDu83wbuwcXHOk1uZjcPGNkNGtHHOg2b3X7N7rftzgs5XT+0f+n8iDi189/uXZ3QsL9tOqqno/nqmm0uajyypiW5kzhxFZf72DsWwrc6nZu9/s3S89ilvZOdbmY7B+vtD94z/PoamVi0Ur5sh+sHa+uf5twMCLYrBWNhatlZPnPuxgGNJc/y5w9Hk0WHuts7GCw1GZj4l1GYvWyjMvnet4yLF++/qn6CnkdeqdF0PGzRKOynyMExWLVqJwVObjMbGxaOUKR2vJI5IhFq2M4aiWNR95YtFKGo7W8kQkWyxaxw3Hx59cmtVUxtp6ZaPo/cNt/zAsev9rn16d+t+mrhyK5amskOEQMhxChkPIcAgZDiHDIXTcjwmWfgmmY/IlmIqwrQgZDiHDIWQ4hAyHkOEQMhxCvgRbcL4EUxG2FSHDIWQ4hAyHkOEQMhxChkPIcAgZDiHDIWQ4hAyHkOEQMhxChkPIcAgZDiHDIWQ4hAyHkOEQMhxChkPIcAgZDiHDIWQ4hAyHkOEQMhxChkPIcAgZDqG/AdG/o/wYe6mcAAAAAElFTkSuQmCC"/>
 <style>
   :root{
     --blue:#0b3d66; --blue-2:#14598f; --accent:#e63946;
@@ -117,6 +118,7 @@
   .empty{text-align:center;color:var(--muted);padding:30px;font-size:.9rem}
   .note{font-size:.82rem;color:var(--muted);text-align:center;margin:18px 0}
   h2.section{font-size:1.05rem;margin:4px 0 14px}
+  body:has(#installBar:not(.hidden)){padding-bottom:88px}
 
   /* Quiz */
   .q{padding:16px 18px;border-bottom:1px solid var(--line)}
@@ -242,7 +244,7 @@
       <option value="Matros">Matros</option>
     </select>
     <button class="btn" onclick="login()">Logg inn</button>
-    <p class="note">Ingen passord – du logger inn med navnet ditt. Data lagres lokalt på denne maskinen.</p>
+    <p class="note">Ingen passord – logg inn med navn og fødselsdato. Resultatene lagres trygt.</p>
   </div>
 </div>
 
