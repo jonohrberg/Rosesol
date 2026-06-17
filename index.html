@@ -860,10 +860,10 @@ function sbSync(key){
   if(!SB_URL||!SB_KEY) return;
   try{
     const d=db(); const p=d.people[key]; if(!p) return;
-    fetch(SB_URL+"/rest/v1/results",{
+    fetch(SB_URL+"/rest/v1/rpc/submit_result",{
       method:"POST",
-      headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=minimal"},
-      body:JSON.stringify(sbRow(p))
+      headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"},
+      body:JSON.stringify({p:sbRow(p)})
     }).catch(()=>{});
   }catch(e){}
 }
@@ -934,9 +934,9 @@ async function adminResync(){
   let last=""; let okCount=0;
   for(const k of keys){
     try{
-      const r=await fetch(SB_URL+"/rest/v1/results",{method:"POST",
-        headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=minimal"},
-        body:JSON.stringify(sbRow(d.people[k]))});
+      const r=await fetch(SB_URL+"/rest/v1/rpc/submit_result",{method:"POST",
+        headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"},
+        body:JSON.stringify({p:sbRow(d.people[k])})});
       last="HTTP "+r.status;
       if(r.ok){ okCount++; } else { last+=" – "+(await r.text()).slice(0,160); }
     }catch(e){ last="Nettverksfeil: "+((e&&e.message)||e); }
